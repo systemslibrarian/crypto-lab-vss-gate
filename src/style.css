@@ -54,6 +54,29 @@ body {
   min-height: 100%;
 }
 
+/* Accessibility: screen reader only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Global focus indicator */
+:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 body {
   font-family: 'Chakra Petch', sans-serif;
   color: var(--ink);
@@ -125,13 +148,14 @@ h1 {
   color: var(--brand-soft);
 }
 
-h3 {
+h2 {
   margin: 0 0 0.5rem;
   font-size: clamp(1.1rem, 2.2vw, 1.4rem);
 }
 
-h4 {
+h3 {
   margin: 0 0 0.5rem;
+  font-size: clamp(1rem, 1.8vw, 1.2rem);
   color: var(--brand-soft);
 }
 
@@ -168,6 +192,7 @@ li {
   right: 1rem;
   width: 2.6rem;
   height: 2.6rem;
+  min-height: 2.6rem;
   border-radius: 50%;
   border: 1px solid var(--line);
   background: var(--surface-1);
@@ -178,10 +203,13 @@ li {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  box-shadow: none;
 }
 
 .theme-toggle:hover {
   background: var(--surface-2);
+  box-shadow: none;
+  transform: none;
 }
 
 .controls-grid {
@@ -215,6 +243,7 @@ input[type='number'],
 select {
   width: 100%;
   padding: 0.56rem 0.7rem;
+  min-height: 2.75rem;
   border-radius: 0.65rem;
   border: 1px solid var(--line);
   background: var(--surface-1);
@@ -225,6 +254,7 @@ button {
   border: 1px solid var(--line);
   border-radius: 0.75rem;
   padding: 0.6rem 1rem;
+  min-height: 2.75rem;
   color: var(--paper);
   background: linear-gradient(135deg, var(--brand), var(--brand-dark));
   font-weight: 600;
@@ -254,6 +284,7 @@ th {
 
 .table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--surface-1);
   border-radius: 0.7rem;
   border: 1px solid var(--line);
@@ -304,11 +335,19 @@ th {
 .mono {
   font-family: 'JetBrains Mono', monospace;
   color: var(--brand-soft);
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .linkline a,
 a {
   color: var(--brand-soft);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
 }
 
 .muted {
@@ -329,5 +368,23 @@ a {
   .theme-toggle {
     top: 0.7rem;
     right: 0.7rem;
+  }
+
+  .controls-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  th,
+  td {
+    padding: 0.35rem 0.3rem;
+    font-size: 0.82rem;
   }
 }

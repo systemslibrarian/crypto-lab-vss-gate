@@ -20,6 +20,14 @@ if (!app) {
   throw new Error('Missing #app root');
 }
 
+const escapeHtml = (unsafe: string): string =>
+  unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
 type AppState = {
   theme: ThemeMode;
   secretInput: string;
@@ -35,6 +43,7 @@ type AppState = {
   sideBySidePedersen: PedersenRun | null;
   pedersenPrevCommitments: bigint[] | null;
   pvssCheck: { participant: number; ok: boolean; lhs: bigint; rhs: bigint } | null;
+  shamirCache: { key: string; result: ReturnType<typeof shamirDemo> } | null;
 };
 
 const getTheme = (): ThemeMode =>
@@ -64,7 +73,8 @@ const state: AppState = {
   sideBySideFeldman: null,
   sideBySidePedersen: null,
   pedersenPrevCommitments: null,
-  pvssCheck: null
+  pvssCheck: null,
+  shamirCache: null
 };
 
 const clampPositiveInt = (value: string, fallback: number, min: number, max: number): number => {
@@ -106,7 +116,12 @@ const render = (): void => {
   state.theme = getTheme();
   const themeMeta = getThemeMeta(state.theme);
   const secret = parseSecret();
-  const shamir = shamirDemo(secret, state.shamirCheatEnabled ? state.shamirCheatParticipant : null);
+  const shamirCheat = state.shamirCheatEnabled ? state.shamirCheatParticipant : null;
+  const shamirCacheKey = `${secret}|${shamirCheat}`;
+  if (!state.shamirCache || state.shamirCache.key !== shamirCacheKey) {
+    state.shamirCache = { key: shamirCacheKey, result: shamirDemo(secret, shamirCheat) };
+  }
+  const shamir = state.shamirCache.result;
 
   app.innerHTML = `
     <main class="shell" id="main-content" role="main">
@@ -127,26 +142,27 @@ const render = (): void => {
       </header>
 
       <section class="exhibit">
-        <h3>Exhibit 1 — Why Shamir Alone Is Not Enough</h3>
+        <h2>Exhibit 1 — Why Shamir Alone Is Not Enough</h2>
         <p>
           In plain Shamir SSS, participants receive points (xᵢ, yᵢ) but cannot verify if yᵢ came from the committed polynomial.
           A malicious dealer can send one corrupted share that looks normal until reconstruction fails.
         </p>
         <div class="controls-grid">
-          <label>Secret (integer)
-            <input id="secret-input" type="text" value="${state.secretInput}" />
+          <label for="secret-input">Secret (integer)
+            <input id="secret-input" type="text" value="${escapeHtml(state.secretInput)}" />
           </label>
-          <label>Cheated participant
+          <label for="shamir-cheat-participant">Cheated participant
             <select id="shamir-cheat-participant">${[1, 2, 3, 4].map((i) => `<option value="${i}" ${state.shamirCheatParticipant === i ? 'selected' : ''}>Participant ${i}</option>`).join('')}</select>
           </label>
-          <label class="checkbox-label">
+          <label for="shamir-cheat-enabled" class="checkbox-label">
             <input id="shamir-cheat-enabled" type="checkbox" ${state.shamirCheatEnabled ? 'checked' : ''} />
             Cheating dealer mode
           </label>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Shamir shares table">
           <table>
-            <thead><tr><th>Participant</th><th>Type</th><th>Value</th></tr></thead>
+            <caption class="sr-only">Shamir secret shares for 4 participants</caption>
+            <thead><tr><th scope="col">Participant</th><th scope="col">Type</th><th scope="col">Value</th></tr></thead>
             <tbody>${renderShareRows(shamir.shares)}</tbody>
           </table>
         </div>
@@ -165,23 +181,23 @@ const render = (): void => {
         </p>
       </section>
 
-      <section class="exhibit">
-        <h3>Exhibit 2 — Feldman VSS</h3>
+      <section class="exhibit" aria-live="polite">
+        <h2>Exhibit 2 — Feldman VSS</h2>
         <p>
           Dealer picks f(x)=s+a₁x+... over Z<sub>q</sub>, publishes commitments Cⱼ=g<sup>aⱼ</sup> mod p, then each participant verifies
           g<sup>sᵢ</sup> = ∏ Cⱼ<sup>iʲ</sup> mod p.
         </p>
         <div class="controls-grid">
-          <label>Threshold t
+          <label for="threshold-input">Threshold t
             <input id="threshold-input" type="number" min="2" max="6" value="${state.threshold}" />
           </label>
-          <label>Participants n
+          <label for="participants-input">Participants n
             <input id="participants-input" type="number" min="2" max="8" value="${state.participants}" />
           </label>
-          <label>Cheated participant
+          <label for="feldman-cheat-participant">Cheated participant
             <select id="feldman-cheat-participant">${Array.from({ length: state.participants }, (_, i) => i + 1).map((i) => `<option value="${i}" ${state.cheatParticipant === i ? 'selected' : ''}>Participant ${i}</option>`).join('')}</select>
           </label>
-          <label class="checkbox-label">
+          <label for="cheat-enabled" class="checkbox-label">
             <input id="cheat-enabled" type="checkbox" ${state.cheatEnabled ? 'checked' : ''} />
             Introduce cheating dealer
           </label>
@@ -193,8 +209,8 @@ const render = (): void => {
         </p>
       </section>
 
-      <section class="exhibit">
-        <h3>Exhibit 3 — Pedersen VSS</h3>
+      <section class="exhibit" aria-live="polite">
+        <h2>Exhibit 3 — Pedersen VSS</h2>
         <p>
           Dealer uses two polynomials f(x), r(x) and commitments Cⱼ=g<sup>fⱼ</sup>·h<sup>rⱼ</sup> mod p.
           Participant i checks g<sup>sᵢ</sup>·h<sup>rᵢ</sup> = ∏ Cⱼ<sup>iʲ</sup> mod p.
@@ -206,33 +222,33 @@ const render = (): void => {
         </p>
       </section>
 
-      <section class="exhibit">
-        <h3>Exhibit 4 — Side-by-Side: Feldman vs Pedersen</h3>
+      <section class="exhibit" aria-live="polite">
+        <h2>Exhibit 4 — Side-by-Side: Feldman vs Pedersen</h2>
         <p>Same secret and threshold, two protocols side by side.</p>
         <button id="run-compare" type="button">Run Side-by-Side</button>
         ${renderComparison()}
       </section>
 
       <section class="exhibit">
-        <h3>Exhibit 5 — VSS in the Real World</h3>
+        <h2>Exhibit 5 — VSS in the Real World</h2>
         <div class="card-grid">
           <article class="card">
-            <h4>Deployment A — FROST Threshold Signatures (RFC 9591)</h4>
+            <h3>Deployment A — FROST Threshold Signatures (RFC 9591)</h3>
             <p>FROST DKG uses Feldman VSS so participants can validate distributed shares before signing rounds.</p>
             <a href="https://systemslibrarian.github.io/crypto-lab-frost-threshold/" target="_blank" rel="noreferrer">Open FROST Threshold demo</a>
           </article>
           <article class="card">
-            <h4>Deployment B — Threshold Wallet Key Generation</h4>
+            <h3>Deployment B — Threshold Wallet Key Generation</h3>
             <p>Wallet MPC stacks use VSS-backed DKG so no single machine holds the full private key.</p>
           </article>
           <article class="card">
-            <h4>Deployment C — Publicly Verifiable Secret Sharing (PVSS)</h4>
+            <h3>Deployment C — Publicly Verifiable Secret Sharing (PVSS)</h3>
             <p>PVSS extends VSS so third parties can validate shares against public commitments.</p>
             <button id="run-pvss-check" type="button">Run third-party share check</button>
             ${state.pvssCheck ? `<p class="mono">P${state.pvssCheck.participant}: ${boolMark(state.pvssCheck.ok)} | lhs=${short(state.pvssCheck.lhs)} rhs=${short(state.pvssCheck.rhs)}</p>` : '<p class="muted">Generate Feldman output first, then run a public share check.</p>'}
           </article>
         </div>
-        <pre class="family-tree">Shamir SSS (no verification)
+        <pre class="family-tree" role="img" aria-label="VSS family tree: Shamir leads to Feldman, Pedersen, PVSS, DKG, then FROST GG20 DKLS23">Shamir SSS (no verification)
 └─ Feldman VSS (computational hiding, public commitments)
    └─ Pedersen VSS (information-theoretic hiding, blinded commitments)
       └─ PVSS (third-party verifiable)
@@ -250,7 +266,7 @@ const render = (): void => {
       </section>
 
       <section class="exhibit">
-        <h3>Cryptographic Parameters</h3>
+        <h2>Cryptographic Parameters</h2>
         <p class="mono">p = ${short(P)}</p>
         <p class="mono">q = (p-1)/2 = ${short(Q)}</p>
         <p class="mono">g = ${G.toString()} (subgroup generator), h = ${H.toString()} (second generator for Pedersen commitments)</p>
@@ -278,22 +294,25 @@ const renderFeldman = (run: FeldmanRun): string => {
   return `
     <p class="mono">f(x) coefficients: ${coefficientList}</p>
     <div class="grid-2">
-      <div class="table-wrap">
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Feldman commitments">
         <table>
-          <thead><tr><th>Commitment</th><th>Value</th></tr></thead>
+          <caption class="sr-only">Public commitments C₀ through C_{t-1}</caption>
+          <thead><tr><th scope="col">Commitment</th><th scope="col">Value</th></tr></thead>
           <tbody>${commitmentRows}</tbody>
         </table>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Feldman shares">
         <table>
-          <thead><tr><th>Participant</th><th>Share</th></tr></thead>
+          <caption class="sr-only">Participant shares</caption>
+          <thead><tr><th scope="col">Participant</th><th scope="col">Share</th></tr></thead>
           <tbody>${run.shares.map((s) => `<tr><td>P${s.participant}</td><td class="mono">${short(s.value)}</td></tr>`).join('')}</tbody>
         </table>
       </div>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Feldman verification results">
       <table>
-        <thead><tr><th>Participant</th><th>LHS</th><th>RHS</th><th>Result</th></tr></thead>
+        <caption class="sr-only">Share verification equations and results</caption>
+        <thead><tr><th scope="col">Participant</th><th scope="col">LHS</th><th scope="col">RHS</th><th scope="col">Result</th></tr></thead>
         <tbody>${verificationRows}</tbody>
       </table>
     </div>
@@ -321,22 +340,25 @@ const renderPedersen = (run: PedersenRun, previousCommitments: bigint[] | null):
     <p class="mono">f(x): ${coefficientF}</p>
     <p class="mono">r(x): ${coefficientR}</p>
     <div class="grid-2">
-      <div class="table-wrap">
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Pedersen commitments">
         <table>
-          <thead><tr><th>Commitment</th><th>Value</th><th>Run delta</th></tr></thead>
+          <caption class="sr-only">Pedersen blinded commitments</caption>
+          <thead><tr><th scope="col">Commitment</th><th scope="col">Value</th><th scope="col">Run delta</th></tr></thead>
           <tbody>${commitmentRows}</tbody>
         </table>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Pedersen shares">
         <table>
-          <thead><tr><th>Participant</th><th>Share pair</th></tr></thead>
+          <caption class="sr-only">Participant share pairs (s, r)</caption>
+          <thead><tr><th scope="col">Participant</th><th scope="col">Share pair</th></tr></thead>
           <tbody>${run.shares.map((s) => `<tr><td>P${s.participant}</td><td class="mono">(s=${short(s.s)}, r=${short(s.r)})</td></tr>`).join('')}</tbody>
         </table>
       </div>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Pedersen verification results">
       <table>
-        <thead><tr><th>Participant</th><th>LHS</th><th>RHS</th><th>Result</th></tr></thead>
+        <caption class="sr-only">Share verification equations and results</caption>
+        <thead><tr><th scope="col">Participant</th><th scope="col">LHS</th><th scope="col">RHS</th><th scope="col">Result</th></tr></thead>
         <tbody>${verificationRows}</tbody>
       </table>
     </div>
@@ -354,19 +376,20 @@ const renderComparison = (): string => {
   return `
     <div class="grid-2">
       <article class="card">
-        <h4>Feldman panel</h4>
+        <h3>Feldman panel</h3>
         <p class="mono">Commitments: ${feldmanCommitments}</p>
         <p>${state.sideBySideFeldman.verification.every((x) => x.ok) ? 'All checks pass' : 'At least one check failed'}</p>
       </article>
       <article class="card">
-        <h4>Pedersen panel</h4>
+        <h3>Pedersen panel</h3>
         <p class="mono">Commitments: ${pedersenCommitments}</p>
         <p>${state.sideBySidePedersen.verification.every((x) => x.ok) ? 'All checks pass' : 'At least one check failed'}</p>
       </article>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Feldman vs Pedersen comparison">
       <table>
-        <thead><tr><th>Property</th><th>Feldman VSS (1987)</th><th>Pedersen VSS (1991)</th></tr></thead>
+        <caption class="sr-only">Property comparison between Feldman and Pedersen VSS</caption>
+        <thead><tr><th scope="col">Property</th><th scope="col">Feldman VSS (1987)</th><th scope="col">Pedersen VSS (1991)</th></tr></thead>
         <tbody>
           <tr><td>Commitment type</td><td class="mono">g^(a_j)</td><td class="mono">g^(a_j) · h^(r_j)</td></tr>
           <tr><td>Hiding property</td><td>Computational</td><td>Information-theoretic</td></tr>
