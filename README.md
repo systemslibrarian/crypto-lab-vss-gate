@@ -22,7 +22,16 @@ npm install
 npm run dev
 ```
 
-## 5. Part of the Crypto-Lab Suite
+## 5. GitHub Pages Setup
+This repository deploys automatically via GitHub Actions using [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml).
+
+Required one-time repo setting:
+- In GitHub: `Settings -> Pages -> Source`, set `Build and deployment` to `GitHub Actions`.
+
+After that, every push to `main` publishes the Vite `dist/` output to:
+- https://systemslibrarian.github.io/crypto-lab-vss-gate/
+
+## 6. Part of the Crypto-Lab Suite
 Part of [crypto-lab](https://systemslibrarian.github.io/crypto-lab/) — browser-based cryptography demos spanning 2,500 years of cryptographic history to NIST FIPS 2024 post-quantum standards.
 
 Whether you eat or drink or whatever you do, do it all for the glory of God. — 1 Corinthians 10:31
