@@ -45,13 +45,6 @@ const PRIME_HEX =
   '62F356208552BB9ED529077096966D670C354E4ABC9804F174' +
   '6C08CA237327FFFFFFFFFFFFFFFF';
 
-export const P = BigInt(`0x${PRIME_HEX}`);
-export const Q = (P - 1n) / 2n;
-
-// Use a subgroup generator of order Q by squaring canonical g=2.
-export const G = 4n;
-export const H = deriveSecondGenerator();
-
 export const mod = (value: bigint, modulus: bigint): bigint => {
   const r = value % modulus;
   return r >= 0n ? r : r + modulus;
@@ -70,6 +63,13 @@ export const modPow = (base: bigint, exponent: bigint, modulus: bigint): bigint 
   }
   return result;
 };
+
+export const P = BigInt(`0x${PRIME_HEX}`);
+export const Q = (P - 1n) / 2n;
+
+// Use a subgroup generator of order Q by squaring canonical g=2.
+export const G = 4n;
+export const H = deriveSecondGenerator();
 
 const bytesToBigint = (bytes: Uint8Array): bigint => {
   let hex = '';
