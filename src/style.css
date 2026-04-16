@@ -376,45 +376,222 @@ html[data-theme='light'] .row-focus td {
   background: hsl(0 70% 90%);
 }
 
-/* Start Here guided flow */
-.start-here h2 {
+/* ── Hero navigation ─────────────────────────────────── */
+.hero-question {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.hero-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.btn-outline {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--brand);
+  border-radius: 0.65rem;
+  color: var(--brand-soft);
+  font-weight: 600;
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+
+.btn-outline:hover {
+  background: var(--brand-glow);
+  text-decoration: none;
+}
+
+/* ── Decision guide ──────────────────────────────────── */
+.decision-guide h2 {
   color: var(--accent);
 }
 
-.step-grid {
+.decision-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 0.8rem;
   margin-top: 0.6rem;
 }
 
-.step-card {
+.decision-card {
   border: 1px solid var(--line);
   border-radius: 0.75rem;
-  padding: 0.8rem;
+  padding: 0.9rem;
   background: var(--surface-1);
 }
 
-.step-card h3 {
-  margin: 0 0 0.3rem;
+.decision-card h3 {
+  margin: 0 0 0.35rem;
 }
 
-.step-card .delta {
-  font-size: 0.82rem;
-  color: var(--accent);
-  font-style: italic;
-}
-
-.step-link {
-  display: inline-block;
-  margin-top: 0.4rem;
-  color: var(--brand-soft);
+.decision-when {
   font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
+  color: var(--ok);
+  font-size: 0.9rem;
 }
 
-/* Learning panel */
+.decision-risk {
+  font-size: 0.85rem;
+  color: var(--danger-soft);
+  margin-top: 0.3rem;
+}
+
+html[data-theme='light'] .decision-risk {
+  color: var(--danger);
+}
+
+/* ── Lab step sections ───────────────────────────────── */
+.lab-step {
+  position: relative;
+}
+
+.step-number {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: hsl(33 90% 55% / 0.15);
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  margin-bottom: 0.4rem;
+}
+
+html[data-theme='light'] .step-number {
+  background: hsl(33 90% 55% / 0.12);
+}
+
+/* ── Decision-first section blocks ───────────────────── */
+.section-about,
+.section-happened,
+.section-matters,
+.section-usecase,
+.section-tradeoffs {
+  border-left: 3px solid var(--line);
+  background: var(--surface-1);
+  border-radius: 0.6rem;
+  padding: 0.65rem 0.9rem;
+  margin: 0.6rem 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.section-about {
+  border-left-color: var(--brand);
+}
+
+.section-happened {
+  border-left-color: var(--ok);
+}
+
+.section-matters {
+  border-left-color: var(--accent);
+}
+
+.section-usecase {
+  border-left-color: hsl(270 60% 60%);
+}
+
+.section-tradeoffs {
+  border-left-color: var(--warn);
+}
+
+.section-about strong,
+.section-happened strong,
+.section-matters strong,
+.section-usecase strong,
+.section-tradeoffs strong {
+  display: block;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin-bottom: 0.25rem;
+}
+
+.section-tradeoffs ul {
+  margin: 0.3rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.section-tradeoffs li {
+  margin-bottom: 0.2rem;
+  font-size: 0.88rem;
+}
+
+/* ── Result blocks ───────────────────────────────────── */
+.result-block {
+  border-radius: 0.7rem;
+  padding: 0.75rem 1rem;
+  margin: 0.7rem 0;
+}
+
+.result-ok {
+  background: hsl(150 60% 18% / 0.2);
+  border: 1px solid var(--ok);
+}
+
+.result-bad {
+  background: hsl(2 60% 22% / 0.2);
+  border: 1px solid var(--danger);
+}
+
+html[data-theme='light'] .result-ok {
+  background: hsl(155 55% 92%);
+}
+
+html[data-theme='light'] .result-bad {
+  background: hsl(0 70% 94%);
+}
+
+.result-block p {
+  margin: 0.25rem 0;
+}
+
+/* ── Threat model ────────────────────────────────────── */
+.threat-model h2 {
+  color: var(--warn);
+}
+
+.threat-model .card h3 {
+  font-size: 0.95rem;
+}
+
+.threat-model .card ul {
+  padding-left: 1.1rem;
+  margin: 0.3rem 0 0;
+}
+
+.threat-model .card li {
+  font-size: 0.88rem;
+  margin-bottom: 0.2rem;
+}
+
+/* ── References ──────────────────────────────────────── */
+.references {
+  margin-top: 0.8rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--line);
+}
+
+.references ul {
+  padding-left: 1.2rem;
+  margin: 0.3rem 0 0;
+}
+
+.references li {
+  font-size: 0.85rem;
+  margin-bottom: 0.2rem;
+  color: var(--muted);
+}
+
+/* ── Legacy / kept for compatibility ─────────────────── */
 .learning-list {
   padding-left: 1.2rem;
   margin: 0.4rem 0 0;
@@ -424,7 +601,6 @@ html[data-theme='light'] .row-focus td {
   margin-bottom: 0.3rem;
 }
 
-/* Protocol flow cards */
 .flow-card {
   border: 1px solid var(--line);
   border-radius: 0.75rem;

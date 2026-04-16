@@ -8,11 +8,14 @@
     "build": "tsc -b && vite build",
     "deploy": "npm run build && gh-pages -d dist",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "gh-pages": "^6.3.0",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "^3.1.1"
   }
 }
