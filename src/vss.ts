@@ -34,6 +34,11 @@ export type PedersenRun = {
   cheatedParticipant: number | null;
 };
 
+export type RunOptions = {
+  deterministic?: boolean;
+  seed?: string;
+};
+
 // RFC 3526 group 14 prime (2048-bit safe prime).
 const PRIME_HEX =
   'FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E08' +
@@ -79,21 +84,86 @@ const bytesToBigint = (bytes: Uint8Array): bigint => {
   return BigInt(`0x${hex || '00'}`);
 };
 
-const randomBigintBelow = (modulus: bigint): bigint => {
-  const byteLength = Math.ceil(modulus.toString(2).length / 8);
-  const bytes = new Uint8Array(byteLength);
+
+const hashStringToBigint = (input: string): bigint => {
+  let acc = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  for (let i = 0; i < input.length; i += 1) {
+    acc ^= BigInt(input.charCodeAt(i));
+    acc = mod(acc * prime, 1n << 64n);
+  }
+  return acc;
+};
+
+const createDeterministicRng = (seed: string): (() => bigint) => {
+  let state = hashStringToBigint(seed) | 1n;
+  return () => {
+    state ^= state << 13n;
+    state ^= state >> 7n;
+    state ^= state << 17n;
+    return mod(state, 1n << 64n);
+  };
+};
+const randomBigintBelow = (modulus: bigint, deterministicRng?: () => bigint): bigint => {
+  if (deterministicRng) {
+    while (true) {
+      const candidate = mod(deterministicRng(), modulus);
+      if (candidate > 0n && candidate < modulus) {
+        return candidate;
+      }
+    }
+  }
+
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const byteLength = Math.ceil(modulus.toString(2).length / 8);
+    const bytes = new Uint8Array(byteLength);
+    while (true) {
+      crypto.getRandomValues(bytes);
+      const candidate = bytesToBigint(bytes);
+      if (candidate > 0n && candidate < modulus) {
+        return candidate;
+      }
+    }
+  }
+
   while (true) {
-    crypto.getRandomValues(bytes);
-    const candidate = bytesToBigint(bytes);
+    const candidate = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
     if (candidate > 0n && candidate < modulus) {
       return candidate;
     }
   }
 };
 
-const hashToBigint = async (input: string): Promise<bigint> => {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
-  return bytesToBigint(new Uint8Array(digest));
+const randomSeed = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  return `fallback-${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+};
+
+const normalizeRunOptions = (options?: RunOptions): { deterministic: boolean; seed: string } => ({
+  deterministic: Boolean(options?.deterministic),
+  seed: options?.seed ?? randomSeed()
+});
+
+const deriveDeterministicScalar = (seed: string, label: string, secret: bigint, i: number): bigint => {
+  const h = hashStringToBigint(`${seed}|${label}|${secret.toString()}|${i}`);
+  return mod(h, Q - 1n) + 1n;
+};
+
+const resolvePolynomial = (
+  secret: bigint,
+  threshold: number,
+  label: string,
+  options?: RunOptions
+): bigint[] => {
+  const run = normalizeRunOptions(options);
+  if (!run.deterministic) {
+    return buildRandomPolynomial(secret, threshold);
+  }
+  return buildDeterministicPolynomial(secret, threshold, label, run.seed);
 };
 
 function deriveSecondGenerator(): bigint {
@@ -120,19 +190,23 @@ const evalPolynomial = (coefficients: bigint[], x: bigint, modulus: bigint): big
   return acc;
 };
 
-const buildRandomPolynomial = (secret: bigint, threshold: number): bigint[] => {
+const buildRandomPolynomial = (secret: bigint, threshold: number, deterministicRng?: () => bigint): bigint[] => {
   const coefficients: bigint[] = [mod(secret, Q)];
   for (let i = 1; i < threshold; i += 1) {
-    coefficients.push(randomBigintBelow(Q));
+    coefficients.push(randomBigintBelow(Q, deterministicRng));
   }
   return coefficients;
 };
 
-export const buildDeterministicPolynomial = async (secret: bigint, threshold: number, label: string): Promise<bigint[]> => {
+export const buildDeterministicPolynomial = (
+  secret: bigint,
+  threshold: number,
+  label: string,
+  seed = 'vss-gate-demo-seed'
+): bigint[] => {
   const coefficients: bigint[] = [mod(secret, Q)];
   for (let i = 1; i < threshold; i += 1) {
-    const h = await hashToBigint(`${label}|${secret.toString()}|${i}`);
-    coefficients.push(mod(h, Q - 1n) + 1n);
+    coefficients.push(deriveDeterministicScalar(seed, label, secret, i));
   }
   return coefficients;
 };
@@ -229,9 +303,10 @@ export const runFeldman = (
   secret: bigint,
   threshold: number,
   participants: number,
-  cheatParticipant: number | null
+  cheatParticipant: number | null,
+  options?: RunOptions
 ): FeldmanRun => {
-  const coefficients = buildRandomPolynomial(secret, threshold);
+  const coefficients = resolvePolynomial(secret, threshold, 'feldman-f', options);
   return runFeldmanWithPolynomial(coefficients, participants, cheatParticipant);
 };
 
@@ -240,10 +315,18 @@ export const runPedersen = (
   threshold: number,
   participants: number,
   cheatParticipant: number | null,
-  basePolynomial?: bigint[]
+  basePolynomial?: bigint[],
+  options?: RunOptions
 ): PedersenRun => {
-  const fCoefficients = basePolynomial ?? buildRandomPolynomial(secret, threshold);
-  const rCoefficients = Array.from({ length: threshold }, () => randomBigintBelow(Q));
+  const run = normalizeRunOptions(options);
+  const deterministicRng = run.deterministic ? createDeterministicRng(`${run.seed}|pedersen-r`) : undefined;
+  const fCoefficients = basePolynomial ?? resolvePolynomial(secret, threshold, 'pedersen-f', options);
+  const rCoefficients = Array.from({ length: threshold }, (_, i) => {
+    if (run.deterministic) {
+      return deriveDeterministicScalar(run.seed, 'pedersen-r', secret, i + 1);
+    }
+    return randomBigintBelow(Q, deterministicRng);
+  });
   const commitments = pedersenCommitments(fCoefficients, rCoefficients);
 
   const shares: PedersenShare[] = [];
@@ -287,6 +370,39 @@ export const shamirDemo = (secret: bigint, cheatedParticipant: number | null): {
 } => {
   const coefficients = buildRandomPolynomial(secret, 2);
   const shares = sharesFromPolynomial(coefficients, 4);
+  if (cheatedParticipant !== null) {
+    const idx = cheatedParticipant - 1;
+    shares[idx] = { participant: cheatedParticipant, value: mod(shares[idx].value + 1n, Q) };
+  }
+
+  const subset = cheatedParticipant !== null
+    ? [shares[cheatedParticipant - 1], shares[0].participant === cheatedParticipant ? shares[1] : shares[0]]
+    : [shares[0], shares[1]];
+
+  return {
+    coefficients,
+    shares,
+    reconstructed: lagrangeAtZero(subset),
+    subset
+  };
+};
+
+export const shamirDemoWithOptions = (
+  secret: bigint,
+  cheatedParticipant: number | null,
+  options?: RunOptions
+): {
+  coefficients: bigint[];
+  shares: Share[];
+  reconstructed: bigint;
+  subset: Share[];
+} => {
+  const run = normalizeRunOptions(options);
+  const coefficients = run.deterministic
+    ? buildDeterministicPolynomial(secret, 2, 'shamir-demo', run.seed)
+    : buildRandomPolynomial(secret, 2);
+  const shares = sharesFromPolynomial(coefficients, 4);
+
   if (cheatedParticipant !== null) {
     const idx = cheatedParticipant - 1;
     shares[idx] = { participant: cheatedParticipant, value: mod(shares[idx].value + 1n, Q) };
