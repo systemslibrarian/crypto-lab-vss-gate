@@ -1,8 +1,8 @@
-# VSS Gate — Verifiable Secret Sharing Lab
+# crypto-lab-vss-gate
+
+## What It Is
 
 An educational cryptography lab demonstrating **Feldman VSS (FOCS 1987)** and **Pedersen VSS (CRYPTO 1991)** — the two foundational constructions that add verifiability to Shamir's Secret Sharing.
-
-## What This Project Is
 
 An interactive, browser-based lab that teaches:
 
@@ -12,6 +12,50 @@ An interactive, browser-based lab that teaches:
 - What setup assumptions each protocol requires
 
 The lab includes a guided four-step flow (Break Shamir → Feldman Fix → Pedersen Upgrade → Compare), pass/fail verification badges, beginner/advanced mode toggle, deterministic reproducibility, and a full test suite.
+
+## When to Use It
+
+- Use it to teach the dealer-cheating problem, because it shows that Shamir shares alone carry no proof of polynomial consistency.
+- Use it to compare Feldman and Pedersen side by side, because the four-step flow makes the no-extra-setup / coefficient-leak tradeoff concrete.
+- Use it to explain VSS as the verification layer beneath DKG and threshold signatures, because every serious threshold deployment relies on it.
+- Do NOT use it for real key management — it is a teaching demo: not audited, not constant-time, and the Pedersen generator `h` is derived with a knowable discrete log.
+
+## Live Demo
+
+**[systemslibrarian.github.io/crypto-lab-vss-gate](https://systemslibrarian.github.io/crypto-lab-vss-gate/)**
+
+The lab runs a guided four-step flow — Break Shamir → Feldman Fix → Pedersen Upgrade → Compare — that first shows a malicious dealer slipping a bad share past plain Shamir, then watches Feldman commitments catch it, then upgrades to Pedersen for information-theoretic hiding, and finally contrasts the two. Pass/fail verification badges, a beginner/advanced mode toggle, and deterministic reproducibility let you change shares and watch verification accept or reject them live.
+
+## What Can Go Wrong
+
+- With plain Shamir, a malicious dealer can hand out inconsistent shares that pass naive reconstruction but corrupt the recovered secret — the exact gap VSS closes.
+- Feldman commitments publish `C_j = g^{a_j} mod p`, which verifies shares but leaks information about the polynomial coefficients; it is not hiding.
+- Pedersen's hiding holds only if the second generator `h` has an unknown discrete log relative to `g`; if `log_g(h)` is known, the binding/hiding guarantee collapses (this demo derives `h` deterministically and is therefore not secure).
+- BigInt arithmetic in JavaScript is not constant-time, so an implementation like this leaks via side channels and must not handle real secrets.
+- Using a generator that does not span the prime-order subgroup, or mismatched participant indices, makes the verification equations and Lagrange reconstruction fail.
+
+## Real-World Usage
+
+- Verifiable secret sharing is the integrity layer beneath Distributed Key Generation (DKG) in threshold systems.
+- Threshold signature protocols such as FROST and GG20 rely on VSS-style checks during key generation.
+- Modern threshold-ECDSA libraries (for example DKLS23-based implementations) use verifiable sharing to detect cheating dealers.
+- Institutional threshold wallets and custody systems use VSS so no single dealer can compromise the shared key.
+
+## How to Run Locally
+
+```bash
+git clone https://github.com/systemslibrarian/crypto-lab-vss-gate
+cd crypto-lab-vss-gate
+npm install
+npm run dev
+```
+
+## Related Demos
+- [crypto-lab-shamir-gate](https://systemslibrarian.github.io/crypto-lab-shamir-gate/) — plain Shamir secret sharing, the scheme VSS adds verifiability to.
+- [crypto-lab-frost-threshold](https://systemslibrarian.github.io/crypto-lab-frost-threshold/) — FROST threshold signatures, which use VSS commitments during key generation.
+- [crypto-lab-gg20-wallet](https://systemslibrarian.github.io/crypto-lab-gg20-wallet/) — threshold-ECDSA distributed key generation built on verifiable sharing.
+- [crypto-lab-threshold-decrypt](https://systemslibrarian.github.io/crypto-lab-threshold-decrypt/) — `t-of-n` threshold decryption that depends on a verifiable DKG.
+- [crypto-lab-silent-tally](https://systemslibrarian.github.io/crypto-lab-silent-tally/) — Shamir-based secure aggregation, another application of secret sharing.
 
 ## What This Project Is NOT
 
@@ -52,19 +96,6 @@ After completing the four-step guided lab, you should understand:
 3. **Pedersen's stronger hiding**: Dual commitments `C_j = g^{a_j} · h^{r_j}` yield information-theoretic hiding, at the cost of a trusted setup for `h`.
 4. **Feldman vs Pedersen tradeoffs**: Feldman requires no extra setup but leaks coefficient information. Pedersen hides coefficients but requires independent `h`.
 
-## Live Demo
-
-**https://systemslibrarian.github.io/crypto-lab-vss-gate/**
-
-## How to Run Locally
-
-```bash
-git clone https://github.com/systemslibrarian/crypto-lab-vss-gate
-cd crypto-lab-vss-gate
-npm install
-npm run dev
-```
-
 ## Test Suite
 
 ```bash
@@ -99,8 +130,8 @@ Deploys automatically via GitHub Actions using [`.github/workflows/deploy-pages.
 
 Required one-time setting: `Settings → Pages → Source → GitHub Actions`.
 
-## Part of the Crypto-Lab Suite
+---
 
-Part of [crypto-lab](https://systemslibrarian.github.io/crypto-lab/) — browser-based cryptography demos spanning 2,500 years of cryptographic history to NIST FIPS 2024 post-quantum standards.
+*One of 60+ browser demos in the [Crypto Lab](https://crypto-lab.systemslibrarian.dev/) suite.*
 
-Whether you eat or drink or whatever you do, do it all for the glory of God. — 1 Corinthians 10:31
+*"So whether you eat or drink or whatever you do, do it all for the glory of God." — 1 Corinthians 10:31*
