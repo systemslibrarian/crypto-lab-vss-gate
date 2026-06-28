@@ -41,14 +41,14 @@ export type RunOptions = {
 
 // RFC 3526 group 14 prime (2048-bit safe prime).
 const PRIME_HEX =
-  'FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E08' +
-  '8A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD' +
-  '3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E' +
-  '7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899F' +
-  'A5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF05' +
-  '98DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C' +
-  '62F356208552BB9ED529077096966D670C354E4ABC9804F174' +
-  '6C08CA237327FFFFFFFFFFFFFFFF';
+  'FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74' +
+  '020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F1437' +
+  '4FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED' +
+  'EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF05' +
+  '98DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB' +
+  '9ED529077096966D670C354E4ABC9804F1746C08CA18217C32905E462E36CE3B' +
+  'E39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9DE2BCBF695581718' +
+  '3995497CEA956AE515D2261898FA051015728E5A8AACAA68FFFFFFFFFFFFFFFF';
 
 export const mod = (value: bigint, modulus: bigint): bigint => {
   const r = value % modulus;
@@ -95,15 +95,6 @@ const hashStringToBigint = (input: string): bigint => {
   return acc;
 };
 
-const createDeterministicRng = (seed: string): (() => bigint) => {
-  let state = hashStringToBigint(seed) | 1n;
-  return () => {
-    state ^= state << 13n;
-    state ^= state >> 7n;
-    state ^= state << 17n;
-    return mod(state, 1n << 64n);
-  };
-};
 const randomBigintBelow = (modulus: bigint, deterministicRng?: () => bigint): bigint => {
   if (deterministicRng) {
     while (true) {
@@ -190,7 +181,7 @@ const evalPolynomial = (coefficients: bigint[], x: bigint, modulus: bigint): big
   return acc;
 };
 
-const buildRandomPolynomial = (secret: bigint, threshold: number, deterministicRng?: () => bigint): bigint[] => {
+export const buildRandomPolynomial = (secret: bigint, threshold: number, deterministicRng?: () => bigint): bigint[] => {
   const coefficients: bigint[] = [mod(secret, Q)];
   for (let i = 1; i < threshold; i += 1) {
     coefficients.push(randomBigintBelow(Q, deterministicRng));
@@ -319,13 +310,12 @@ export const runPedersen = (
   options?: RunOptions
 ): PedersenRun => {
   const run = normalizeRunOptions(options);
-  const deterministicRng = run.deterministic ? createDeterministicRng(`${run.seed}|pedersen-r`) : undefined;
   const fCoefficients = basePolynomial ?? resolvePolynomial(secret, threshold, 'pedersen-f', options);
   const rCoefficients = Array.from({ length: threshold }, (_, i) => {
     if (run.deterministic) {
       return deriveDeterministicScalar(run.seed, 'pedersen-r', secret, i + 1);
     }
-    return randomBigintBelow(Q, deterministicRng);
+    return randomBigintBelow(Q);
   });
   const commitments = pedersenCommitments(fCoefficients, rCoefficients);
 

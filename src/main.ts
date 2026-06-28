@@ -5,7 +5,9 @@ import {
   P,
   Q,
   buildDeterministicPolynomial,
+  buildRandomPolynomial,
   formatBigint,
+  mod,
   runFeldman,
   runFeldmanWithPolynomial,
   runPedersen,
@@ -51,11 +53,6 @@ type AppState = {
 const getTheme = (): ThemeMode =>
   document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
 
-const setTheme = (theme: ThemeMode): void => {
-  document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('theme', theme);
-};
-
 const state: AppState = {
   theme: getTheme(),
   secretInput: '123456789',
@@ -86,10 +83,12 @@ const clampPositiveInt = (value: string, fallback: number, min: number, max: num
 
 const parseSecret = (): bigint => {
   const v = state.secretInput.trim();
+  // BigInt('') is 0n, so an empty/whitespace field would silently become 0 —
+  // treat it as invalid and use the same fallback as a parse failure.
+  if (v === '') {
+    return 1n;
+  }
   try {
-    if (v.startsWith('0x') || v.startsWith('0X')) {
-      return BigInt(v);
-    }
     return BigInt(v);
   } catch {
     return 1n;
@@ -242,6 +241,160 @@ const verificationRows = (
     })
     .join('');
 
+// ── Visual intuition: shares are points on a curve ───────
+
+// Small, *illustrative* coefficients — NOT the 2048-bit field values — so the
+// polynomial can actually be drawn. a0 (the y-intercept at x = 0) is "the secret".
+// Derived deterministically from the typed secret so the picture is stable.
+const illustrativeCoeffs = (secretInput: string, threshold: number): number[] => {
+  let h = 2166136261 >>> 0;
+  for (const ch of secretInput) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  const a0 = 2 + (h % 17); // secret in [2, 18]
+  const coeffs = [a0];
+  for (let j = 1; j < threshold; j += 1) {
+    h = Math.imul(h ^ (j * 2654435761), 16777619) >>> 0;
+    coeffs.push(1 + (h % 4)); // small slope / curvature in [1, 4]
+  }
+  return coeffs;
+};
+
+// Horner evaluation over the reals (for plotting only).
+const evalReal = (coeffs: number[], x: number): number => {
+  let acc = 0;
+  for (let j = coeffs.length - 1; j >= 0; j -= 1) {
+    acc = acc * x + coeffs[j];
+  }
+  return acc;
+};
+
+const renderShareCurve = (): string => {
+  const t = Math.min(state.threshold, state.participants);
+  const n = state.participants;
+  const coeffs = illustrativeCoeffs(state.secretInput, t);
+  const cheatP =
+    state.cheatEnabled && state.cheatParticipant >= 1 && state.cheatParticipant <= n
+      ? state.cheatParticipant
+      : null;
+
+  // Canvas geometry (viewBox units; scales responsively via CSS).
+  const W = 540;
+  const Hh = 320;
+  const padL = 26;
+  const padR = 18;
+  const padT = 22;
+  const padB = 38;
+  const xMin = -0.6;
+  const xMax = n + 0.6;
+
+  // Sample the curve and gather y-extents.
+  const SAMPLES = 240;
+  const curve: Array<[number, number]> = [];
+  for (let k = 0; k <= SAMPLES; k += 1) {
+    const x = xMin + (xMax - xMin) * (k / SAMPLES);
+    curve.push([x, evalReal(coeffs, x)]);
+  }
+  const shareY: number[] = [];
+  for (let i = 1; i <= n; i += 1) {
+    shareY.push(evalReal(coeffs, i));
+  }
+  const secretY = evalReal(coeffs, 0);
+
+  const baseVals = [0, secretY, ...shareY, ...curve.map((p) => p[1])];
+  const baseMax = Math.max(...baseVals);
+  const baseMin = Math.min(...baseVals);
+  const baseRange = Math.max(1, baseMax - baseMin);
+  const bump = Math.max(2, baseRange * 0.26);
+
+  let cheatHonest = 0;
+  let cheatBad = 0;
+  let yMax = baseMax;
+  const yMin = baseMin;
+  if (cheatP !== null) {
+    cheatHonest = evalReal(coeffs, cheatP);
+    cheatBad = cheatHonest + bump;
+    yMax = Math.max(yMax, cheatBad);
+  }
+  const range = Math.max(1, yMax - yMin);
+  const top = yMax + range * 0.1;
+  const bottom = yMin - range * 0.08;
+
+  const sx = (x: number): number =>
+    padL + ((x - xMin) / (xMax - xMin)) * (W - padL - padR);
+  const sy = (y: number): number =>
+    Hh - padB - ((y - bottom) / (top - bottom)) * (Hh - padT - padB);
+  const f = (v: number): string => v.toFixed(1);
+
+  const curvePath = curve
+    .map((p, i) => `${i === 0 ? 'M' : 'L'}${f(sx(p[0]))} ${f(sy(p[1]))}`)
+    .join(' ');
+
+  const baseY = sy(bottom);
+  const xLabels = Array.from({ length: n }, (_, i) => {
+    const x = sx(i + 1);
+    return `<text x="${f(x)}" y="${f(baseY + 16)}" class="vz-axislabel" text-anchor="middle">P${i + 1}</text>`;
+  }).join('');
+
+  const sharePoints = shareY
+    .map((y, i) => {
+      const p = i + 1;
+      if (cheatP === p) {
+        return '';
+      }
+      return `<circle cx="${f(sx(p))}" cy="${f(sy(y))}" r="5.5" class="vz-share" />`;
+    })
+    .join('');
+
+  const cheatLayer =
+    cheatP === null
+      ? ''
+      : `
+        <line x1="${f(sx(cheatP))}" y1="${f(sy(cheatHonest))}" x2="${f(sx(cheatP))}" y2="${f(sy(cheatBad))}"
+              class="vz-deviation" />
+        <circle cx="${f(sx(cheatP))}" cy="${f(sy(cheatHonest))}" r="5.5" class="vz-ghost" />
+        <circle cx="${f(sx(cheatP))}" cy="${f(sy(cheatBad))}" r="6" class="vz-tampered" />
+        <text x="${f(sx(cheatP))}" y="${f(sy(cheatBad) - 11)}" class="vz-tamperlabel" text-anchor="middle">tampered</text>
+      `;
+
+  const caption =
+    cheatP === null
+      ? `All ${n} points sit on one degree-${t - 1} curve. Any <strong>${t}</strong> of them pin it down exactly — and the secret is the curve's value at <span class="mono">x = 0</span>.`
+      : `The dealer pushed <strong>P${cheatP}</strong>'s point <em>off</em> the curve. With plain Shamir there's no published curve to compare against, so nobody notices — that's the gap. Feldman and Pedersen publish commitments to the curve, which is exactly what lets verification reject this point.`;
+
+  return `
+    <section class="exhibit curve-viz" aria-labelledby="curve-viz-title">
+      <h2 id="curve-viz-title">The picture: shares are points on a curve</h2>
+      <p class="muted">
+        A <span class="mono">t</span>-of-<span class="mono">n</span> sharing hides the secret in a degree-(<span class="mono">t−1</span>)
+        polynomial. Each participant gets one point on it. Adjust the controls above and watch the curve respond.
+      </p>
+      <figure class="curve-figure">
+        <svg viewBox="0 0 ${W} ${Hh}" role="img"
+             aria-label="Polynomial of degree ${t - 1} with ${n} share points${cheatP !== null ? `, participant P${cheatP}'s point tampered off the curve` : ''}, and the secret marked at x equals zero.">
+          <line x1="${f(padL)}" y1="${f(baseY)}" x2="${f(W - padR)}" y2="${f(baseY)}" class="vz-axis" />
+          <line x1="${f(sx(0))}" y1="${f(padT - 6)}" x2="${f(sx(0))}" y2="${f(baseY + 4)}" class="vz-axis vz-axis-y" />
+          <path d="${curvePath}" class="vz-curve" fill="none" />
+          ${sharePoints}
+          ${cheatLayer}
+          <line x1="${f(sx(0))}" y1="${f(sy(secretY))}" x2="${f(sx(0))}" y2="${f(baseY)}" class="vz-secretdrop" />
+          <circle cx="${f(sx(0))}" cy="${f(sy(secretY))}" r="6.5" class="vz-secret" />
+          <text x="${f(sx(0) + 9)}" y="${f(sy(secretY) - 8)}" class="vz-secretlabel" text-anchor="start">secret (x=0)</text>
+          ${xLabels}
+        </svg>
+        <figcaption class="curve-caption">${caption}</figcaption>
+      </figure>
+      <div class="vz-legend" aria-hidden="true">
+        <span class="vz-key"><span class="vz-dot vz-dot-share"></span>share point</span>
+        <span class="vz-key"><span class="vz-dot vz-dot-secret"></span>secret</span>
+        <span class="vz-key"><span class="vz-dot vz-dot-tamper"></span>tampered share</span>
+      </div>
+      <p class="curve-note muted">
+        Illustration only — small whole numbers are used so the curve is drawable. The lab's real arithmetic
+        runs in a 2048-bit prime field where points look like random integers.
+      </p>
+    </section>
+  `;
+};
+
 // ── Step 1: Break Shamir ─────────────────────────────────
 
 const renderStepOne = (): string => {
@@ -262,10 +415,10 @@ const renderStepOne = (): string => {
   }
 
   const shamir = state.shamirCache.result;
-  const reconstructedOk = shamir.reconstructed === (secret % Q + Q) % Q;
+  const reconstructedOk = shamir.reconstructed === mod(secret, Q);
 
   return `
-    <section class="exhibit lab-step" id="step-1" aria-live="polite">
+    <section class="exhibit lab-step" id="step-1">
       <span class="step-number">Step 1</span>
       <h2>Break Shamir</h2>
 
@@ -300,7 +453,7 @@ const renderStepOne = (): string => {
           Reconstruction from {P${shamir.subset[0].participant}, P${shamir.subset[1].participant}} →
           <span class="mono">${short(shamir.reconstructed)}</span>
         </p>
-        <p>Expected: <span class="mono">${short(secret % Q)}</span></p>
+        <p>Expected: <span class="mono">${short(mod(secret, Q))}</span></p>
         <p>${reconstructedOk
           ? 'Reconstruction matched — this run happened to use honest shares.'
           : 'Reconstruction <strong>failed</strong>. The cheated share corrupted the result, and nobody could tell in advance.'
@@ -344,7 +497,7 @@ const renderStepTwo = (): string => {
   const run = state.feldmanRun;
 
   return `
-    <section class="exhibit lab-step" id="step-2" aria-live="polite">
+    <section class="exhibit lab-step" id="step-2">
       <span class="step-number">Step 2</span>
       <h2>Feldman Fix</h2>
 
@@ -439,7 +592,7 @@ const renderStepThree = (): string => {
   const run = state.pedersenRun;
 
   return `
-    <section class="exhibit lab-step" id="step-3" aria-live="polite">
+    <section class="exhibit lab-step" id="step-3">
       <span class="step-number">Step 3</span>
       <h2>Pedersen Upgrade</h2>
 
@@ -552,7 +705,7 @@ const renderStepFour = (): string => {
   const ped = state.sideBySidePedersen;
 
   return `
-    <section class="exhibit lab-step" id="step-4" aria-live="polite">
+    <section class="exhibit lab-step" id="step-4">
       <span class="step-number">Step 4</span>
       <h2>Side-by-Side Comparison</h2>
 
@@ -718,11 +871,30 @@ const renderLearningPath = (): string => `
 const render = (): void => {
   state.theme = getTheme();
 
+  // A render() replaces all of #app, which would drop focus from whatever input
+  // triggered it — making text/number fields impossible to type into (one char
+  // per click). Capture the focused control + caret, then restore them after.
+  const activeEl = document.activeElement as HTMLElement | null;
+  const focusId = activeEl && activeEl.id && app.contains(activeEl) ? activeEl.id : null;
+  let selStart: number | null = null;
+  let selEnd: number | null = null;
+  if (focusId) {
+    try {
+      const input = activeEl as HTMLInputElement;
+      selStart = input.selectionStart;
+      selEnd = input.selectionEnd;
+    } catch {
+      // e.g. number inputs throw on selectionStart access — refocus without caret.
+      selStart = null;
+    }
+  }
+
   app.innerHTML = `
     <main class="shell" id="main-content" role="main">
       ${renderHero()}
       ${renderDecisionGuide()}
       ${renderLabControls()}
+      ${renderShareCurve()}
       ${renderStepOne()}
       ${renderStepTwo()}
       ${renderStepThree()}
@@ -733,7 +905,37 @@ const render = (): void => {
     </main>
   `;
 
+  // Generated tables are header-row only; tag every <th> as a column header so
+  // assistive tech announces "Column, P3" etc. (WCAG 1.3.1).
+  app.querySelectorAll('th:not([scope])').forEach((th) => th.setAttribute('scope', 'col'));
+
   bindEvents();
+
+  if (focusId) {
+    const restored = document.getElementById(focusId) as HTMLInputElement | null;
+    if (restored) {
+      restored.focus();
+      if (selStart !== null && selEnd !== null && typeof restored.setSelectionRange === 'function') {
+        try {
+          restored.setSelectionRange(selStart, selEnd);
+        } catch {
+          // setSelectionRange is invalid for number/checkbox inputs — ignore.
+        }
+      }
+    }
+  }
+};
+
+// Push a message to the persistent live region. Re-setting identical text won't
+// re-announce, so we nudge it with a leading space toggle for repeat actions.
+let lastAnnounce = '';
+const announce = (message: string): void => {
+  const el = document.getElementById('sr-status');
+  if (!el) {
+    return;
+  }
+  el.textContent = message === lastAnnounce ? `${message} ` : message;
+  lastAnnounce = message;
 };
 
 const copyText = async (content: string): Promise<void> => {
@@ -804,11 +1006,13 @@ const bindEvents = (): void => {
   const cheatEnabled = document.querySelector<HTMLInputElement>('#cheat-enabled');
   cheatEnabled?.addEventListener('change', () => {
     state.cheatEnabled = cheatEnabled.checked;
+    render();
   });
 
   const cheatParticipant = document.querySelector<HTMLSelectElement>('#feldman-cheat-participant');
   cheatParticipant?.addEventListener('change', () => {
     state.cheatParticipant = clampPositiveInt(cheatParticipant.value, 2, 1, state.participants);
+    render();
   });
 
   const shamirCheatEnabled = document.querySelector<HTMLInputElement>('#shamir-cheat-enabled');
@@ -835,6 +1039,12 @@ const bindEvents = (): void => {
       deterministicOptions()
     );
     render();
+    const failed = state.feldmanRun.verification.some((v) => !v.ok);
+    announce(
+      failed
+        ? 'Feldman verification finished. Tampered share detected and rejected.'
+        : `Feldman verification finished. All ${state.participants} shares verified.`
+    );
   });
 
   const runPedersenBtn = document.querySelector<HTMLButtonElement>('#run-pedersen');
@@ -850,19 +1060,25 @@ const bindEvents = (): void => {
     );
     state.pedersenPrevCommitments = prior;
     render();
+    const failed = state.pedersenRun.verification.some((v) => !v.ok);
+    announce(
+      failed
+        ? 'Pedersen verification finished. Tampered share detected even with blinded commitments.'
+        : `Pedersen verification finished. All ${state.participants} shares verified.`
+    );
   });
 
   const compareBtn = document.querySelector<HTMLButtonElement>('#run-compare');
   compareBtn?.addEventListener('click', () => {
     const secret = parseSecret();
     const label = `compare-${state.threshold}-${state.participants}`;
+    // Both protocols share ONE secret polynomial f(x) so the comparison isolates
+    // the protocol difference, not the randomness — in random mode too.
     const basePoly = state.deterministicMode
       ? buildDeterministicPolynomial(secret, state.threshold, label, state.deterministicSeed)
-      : undefined;
+      : buildRandomPolynomial(secret, state.threshold);
 
-    state.sideBySideFeldman = basePoly
-      ? runFeldmanWithPolynomial(basePoly, state.participants, null)
-      : runFeldman(secret, state.threshold, state.participants, null, deterministicOptions());
+    state.sideBySideFeldman = runFeldmanWithPolynomial(basePoly, state.participants, null);
 
     state.sideBySidePedersen = runPedersen(
       secret,
@@ -874,6 +1090,7 @@ const bindEvents = (): void => {
     );
 
     render();
+    announce('Comparison ready. Feldman and Pedersen ran with the same secret polynomial and threshold.');
   });
 
   document.querySelectorAll<HTMLButtonElement>('.copy-btn').forEach((btn) => {
@@ -883,6 +1100,7 @@ const bindEvents = (): void => {
         return;
       }
       await copyText(payload);
+      announce('Copied to clipboard.');
       const prev = btn.textContent;
       btn.textContent = 'Copied';
       setTimeout(() => {
@@ -892,21 +1110,8 @@ const bindEvents = (): void => {
   });
 };
 
-// ── Theme toggle (persistent header, outside #app) ──────
-const themeToggleBtn = document.getElementById('themeToggle');
-const updateThemeButton = () => {
-  if (!themeToggleBtn) return;
-  const isDark = getTheme() === 'dark';
-  themeToggleBtn.textContent = isDark ? '☀' : '☾';
-  themeToggleBtn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
-};
-themeToggleBtn?.addEventListener('click', () => {
-  const next: ThemeMode = getTheme() === 'dark' ? 'light' : 'dark';
-  setTheme(next);
-  updateThemeButton();
-  render();
-});
-updateThemeButton();
-// ─────────────────────────────────────────────────────────
+// Theme is owned by the shared Crypto Lab header (#cl-theme-toggle), which flips
+// data-theme + persists it. All page styling keys off CSS variables, so theme
+// changes repaint without a re-render here.
 
 render();

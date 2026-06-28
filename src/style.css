@@ -52,6 +52,21 @@ html,
 body {
   margin: 0;
   min-height: 100%;
+  /* Keep text legible when a phone is rotated; never auto-inflate. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Respect users who ask for reduced motion (WCAG 2.3.3 / vestibular safety). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .sr-only {
@@ -391,7 +406,9 @@ html[data-theme='light'] .row-focus td {
 }
 
 .btn-outline {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px; /* comfortable touch target (WCAG 2.5.5) */
   padding: 0.5rem 1rem;
   border: 1px solid var(--brand);
   border-radius: 0.65rem;
@@ -525,6 +542,171 @@ html[data-theme='light'] .step-number {
   font-size: 0.88rem;
 }
 
+/* ── Share-curve visualization ───────────────────────── */
+.curve-viz h2 {
+  color: var(--brand-soft);
+}
+
+.curve-figure {
+  margin: 0.9rem 0 0;
+}
+
+.curve-figure svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  padding: 0.4rem;
+}
+
+.curve-caption {
+  margin: 0.7rem 0 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+/* SVG element styling — keyed off theme variables so it repaints with the page */
+.vz-axis {
+  stroke: var(--line);
+  stroke-width: 1.5;
+}
+
+.vz-axis-y {
+  stroke-dasharray: 3 4;
+}
+
+.vz-curve {
+  stroke: var(--brand);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vz-share {
+  fill: var(--brand-soft);
+  stroke: var(--brand);
+  stroke-width: 1.6;
+}
+
+.vz-secret {
+  fill: var(--accent);
+  stroke: var(--paper);
+  stroke-width: 1.6;
+}
+
+.vz-secretdrop {
+  stroke: var(--accent);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 4;
+  opacity: 0.7;
+}
+
+.vz-secretlabel {
+  fill: var(--accent-soft);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+html[data-theme='light'] .vz-secretlabel {
+  fill: var(--accent);
+}
+
+.vz-ghost {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 3;
+}
+
+.vz-tampered {
+  fill: var(--danger);
+  stroke: var(--paper);
+  stroke-width: 1.6;
+}
+
+.vz-deviation {
+  stroke: var(--danger);
+  stroke-width: 1.8;
+  stroke-dasharray: 4 3;
+}
+
+.vz-tamperlabel {
+  fill: var(--danger-soft);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+html[data-theme='light'] .vz-tamperlabel {
+  fill: var(--danger);
+}
+
+.vz-axislabel {
+  fill: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+
+/* The SVG scales down with the viewport, so bump label sizes on phones to keep
+   the curve readable without forcing a pinch-zoom. */
+@media (max-width: 560px) {
+  .vz-axislabel {
+    font-size: 16px;
+  }
+
+  .vz-secretlabel {
+    font-size: 15px;
+  }
+
+  .vz-tamperlabel {
+    font-size: 15px;
+  }
+}
+
+.vz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.vz-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.vz-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.vz-dot-share {
+  background: var(--brand-soft);
+  border: 1.5px solid var(--brand);
+}
+
+.vz-dot-secret {
+  background: var(--accent);
+}
+
+.vz-dot-tamper {
+  background: var(--danger);
+}
+
+.curve-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
 /* ── Result blocks ───────────────────────────────────── */
 .result-block {
   border-radius: 0.7rem;
@@ -638,8 +820,8 @@ html[data-theme='light'] .result-bad {
   color: var(--brand-soft);
   border: 1px solid var(--line);
   font-size: 0.82rem;
-  padding: 0.4rem 0.75rem;
-  min-height: 2.2rem;
+  padding: 0.5rem 0.85rem;
+  min-height: 44px; /* comfortable touch target (WCAG 2.5.5) */
 }
 
 .copy-btn:hover {
@@ -703,130 +885,3 @@ a:hover {
     font-size: 0.82rem;
   }
 }
-
-/* ── Standardized Crypto Lab header ───────────────────── */
-.cl-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 20px;
-  background: #0e1f1e;
-  position: relative;
-  overflow: hidden;
-}
-
-.cl-header::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(77, 207, 176, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(77, 207, 176, 0.05) 1px, transparent 1px);
-  background-size: 24px 24px;
-  pointer-events: none;
-}
-
-.cl-header-left {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  position: relative;
-  z-index: 1;
-}
-
-.cl-badge {
-  width: 36px;
-  height: 36px;
-  background: #162b2a;
-  border: 1px solid #2a4a44;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: monospace;
-  font-size: 13px;
-  font-weight: 700;
-  color: #4dcfb0;
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
-}
-
-.cl-header-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.cl-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #e8f5f2;
-  letter-spacing: 1.5px;
-  line-height: 1.2;
-}
-
-.cl-sub {
-  font-size: 11px;
-  color: #4dcfb0;
-  letter-spacing: 1px;
-  font-family: monospace;
-  opacity: 0.8;
-  text-decoration: none;
-}
-
-.cl-sub:hover {
-  opacity: 1;
-  text-decoration: underline;
-}
-
-.cl-header-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-  z-index: 1;
-}
-
-.cl-nav-btn {
-  padding: 6px 14px;
-  font-size: 11px;
-  font-family: monospace;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: #4dcfb0;
-  background: #162b2a;
-  border: 1px solid #2a4a44;
-  border-radius: 6px;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.cl-nav-btn:hover {
-  background: #1e3c3a;
-  border-color: #4dcfb0;
-}
-
-.cl-theme-toggle {
-  width: 36px;
-  height: 36px;
-  background: #162b2a;
-  border: 1px solid #2a4a44;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  cursor: pointer;
-  color: #4dcfb0;
-  transition: background 0.15s, border-color 0.15s;
-  line-height: 1;
-}
-
-.cl-theme-toggle:hover {
-  background: #1e3c3a;
-  border-color: #4dcfb0;
-}
-/* ────────────────────────────────────────────────────── */

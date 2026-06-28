@@ -151,3 +151,22 @@ describe('Crypto primitives', () => {
     expect(modPow(H, Q, P)).toBe(1n);
   });
 });
+
+describe('Group parameters (RFC 3526 group 14)', () => {
+  it('P is exactly 2048 bits', () => {
+    // Guards against a mangled PRIME_HEX literal silently shrinking the field.
+    expect(P.toString(2).length).toBe(2048);
+  });
+
+  it('P is a safe prime: P = 2Q + 1', () => {
+    expect(2n * Q + 1n).toBe(P);
+  });
+
+  it('P passes a Fermat base-2 primality check (2^(P-1) ≡ 1)', () => {
+    expect(modPow(2n, P - 1n, P)).toBe(1n);
+  });
+
+  it('Q passes a Fermat base-2 primality check (2^(Q-1) ≡ 1)', () => {
+    expect(modPow(2n, Q - 1n, Q)).toBe(1n);
+  });
+});

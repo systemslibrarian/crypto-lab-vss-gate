@@ -11,7 +11,7 @@ An interactive, browser-based lab that teaches:
 - How Pedersen adds information-theoretic hiding with blinded commitments
 - What setup assumptions each protocol requires
 
-The lab includes a guided four-step flow (Break Shamir → Feldman Fix → Pedersen Upgrade → Compare), pass/fail verification badges, beginner/advanced mode toggle, deterministic reproducibility, and a full test suite.
+The lab includes a guided four-step flow (Break Shamir → Feldman Fix → Pedersen Upgrade → Compare), an interactive curve visualization that draws shares as points on the secret polynomial (and shows a tampered share jumping off the curve), pass/fail verification badges, beginner/advanced mode toggle, deterministic reproducibility, and a full test suite.
 
 ## When to Use It
 
@@ -24,7 +24,7 @@ The lab includes a guided four-step flow (Break Shamir → Feldman Fix → Peder
 
 **[systemslibrarian.github.io/crypto-lab-vss-gate](https://systemslibrarian.github.io/crypto-lab-vss-gate/)**
 
-The lab runs a guided four-step flow — Break Shamir → Feldman Fix → Pedersen Upgrade → Compare — that first shows a malicious dealer slipping a bad share past plain Shamir, then watches Feldman commitments catch it, then upgrades to Pedersen for information-theoretic hiding, and finally contrasts the two. Pass/fail verification badges, a beginner/advanced mode toggle, and deterministic reproducibility let you change shares and watch verification accept or reject them live.
+The lab runs a guided four-step flow — Break Shamir → Feldman Fix → Pedersen Upgrade → Compare — that first shows a malicious dealer slipping a bad share past plain Shamir, then watches Feldman commitments catch it, then upgrades to Pedersen for information-theoretic hiding, and finally contrasts the two. A live curve visualization makes the geometry concrete: every participant is a point on a single degree-`(t−1)` polynomial whose value at `x = 0` is the secret, and tampering with a share visibly lifts its point off the curve. Pass/fail verification badges, a beginner/advanced mode toggle, and deterministic reproducibility let you change shares and watch verification accept or reject them live.
 
 ## What Can Go Wrong
 

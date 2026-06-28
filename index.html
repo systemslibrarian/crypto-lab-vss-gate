@@ -133,6 +133,9 @@
 <!-- END crypto-lab shared header -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <div id="app"></div>
+    <!-- Persistent polite live region: survives full #app re-renders, so screen
+         readers reliably hear verification/copy outcomes (WCAG 4.1.3). -->
+    <div id="sr-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
     <footer style="text-align:center; padding: 1.5rem; font-size: 0.85rem; opacity: 0.7; margin-top: 2rem;">
       <p class="footer-related">
         Related demos:
