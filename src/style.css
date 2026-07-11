@@ -357,12 +357,14 @@ html[data-theme='light'] .warning-panel {
 
 html[data-theme='light'] .badge.pass {
   background: hsl(155 58% 88%);
-  color: var(--ok);
+  /* Darker than --ok so the badge text clears 4.5:1 on the tinted fill (WCAG 1.4.3). */
+  color: hsl(156 84% 22%);
 }
 
 html[data-theme='light'] .badge.fail {
   background: hsl(0 81% 92%);
-  color: var(--danger);
+  /* Darker than --danger so fail text clears 4.5:1 on the tinted fill. */
+  color: hsl(2 82% 38%);
 }
 
 /* Row highlighting for verification */
