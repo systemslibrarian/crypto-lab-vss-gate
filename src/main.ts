@@ -135,18 +135,18 @@ const sectionTradeoffs = (items: string[]): string =>
 // ── Hero ─────────────────────────────────────────────────
 
 const renderHero = (): string => `
+  <header class="cl-hero">
+    <div class="cl-hero-main">
+      <h1 class="cl-hero-title">VSS Gate</h1>
+      <p class="cl-hero-sub">Feldman &amp; Pedersen VSS · Verifiable Secret Sharing</p>
+      <p class="cl-hero-desc">Watch a cheating dealer poison Shamir shares undetected, then add Feldman and Pedersen commitments so every participant can verify their share before trusting it.</p>
+    </div>
+    <aside class="cl-hero-why" aria-label="Why it matters">
+      <span class="cl-hero-why-label">WHY IT MATTERS</span>
+      <p class="cl-hero-why-text">Plain Shamir sharing assumes an honest dealer — a malicious one can silently hand out bad shares that only fail at reconstruction. VSS lets each holder catch the fraud immediately, and Pedersen even hides the secret from the commitments themselves.</p>
+    </aside>
+  </header>
   <section class="exhibit hero">
-    <p class="eyebrow">Crypto Lab</p>
-    <h1>Verifiable Secret Sharing</h1>
-    <p class="hero-question">
-      How do you split a secret among multiple parties so that <em>no one can cheat</em>
-      — and everyone can verify it?
-    </p>
-    <p>
-      This lab walks you through three protocols — Shamir, Feldman, and Pedersen —
-      each fixing a specific weakness in the one before it.
-      By the end, you'll know which to choose and why.
-    </p>
     <nav class="hero-nav" aria-label="Jump to lab section">
       <a href="#step-1" class="btn-outline">1. Break Shamir</a>
       <a href="#step-2" class="btn-outline">2. Feldman Fix</a>
