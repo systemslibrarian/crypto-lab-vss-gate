@@ -12,6 +12,13 @@ import {
   runPedersen,
   buildDeterministicPolynomial,
   shamirDemoWithOptions,
+  SMALL_P,
+  SMALL_Q,
+  SMALL_G,
+  SMALL_H,
+  feldmanSmallTrace,
+  feldmanHomomorphism,
+  pedersenAlternateOpenings,
   type RunOptions
 } from './vss';
 
@@ -149,6 +156,55 @@ describe('Crypto primitives', () => {
 
   it('H is in the subgroup (H^Q mod P == 1)', () => {
     expect(modPow(H, Q, P)).toBe(1n);
+  });
+});
+
+describe('Small-field illustrative instance', () => {
+  it('SMALL_P is a safe prime and SMALL_G generates the order-q subgroup', () => {
+    expect(2n * SMALL_Q + 1n).toBe(SMALL_P);
+    expect(modPow(2n, SMALL_P - 1n, SMALL_P)).toBe(1n); // Fermat base-2
+    expect(modPow(2n, SMALL_Q - 1n, SMALL_Q)).toBe(1n);
+    expect(modPow(SMALL_G, SMALL_Q, SMALL_P)).toBe(1n);
+    expect(modPow(SMALL_H, SMALL_Q, SMALL_P)).toBe(1n);
+  });
+
+  it('feldmanSmallTrace: honest share verifies, decomposition product equals RHS', () => {
+    const t = feldmanSmallTrace(13n, 5n, 3, false);
+    expect(t.ok).toBe(true);
+    expect(t.lhs).toBe(t.rhs);
+    // last running partial equals the full RHS product
+    expect(t.rhsTerms[t.rhsTerms.length - 1].partial).toBe(t.rhs);
+    // LHS is genuinely g^(shareValue) in the small field
+    expect(t.lhs).toBe(modPow(SMALL_G, t.shareValue, SMALL_P));
+  });
+
+  it('feldmanSmallTrace: tampered share fails and LHS != RHS', () => {
+    const t = feldmanSmallTrace(13n, 5n, 2, true);
+    expect(t.ok).toBe(false);
+    expect(t.lhs).not.toBe(t.rhs);
+    expect(t.shareValue).not.toBe(t.honestValue);
+  });
+
+  it('feldmanHomomorphism: recombined commitments land exactly on g^(f(i))', () => {
+    for (const i of [1, 2, 3, 4]) {
+      const h = feldmanHomomorphism(9n, 3n, i);
+      expect(h.match).toBe(true);
+      expect(h.recombined).toBe(h.gPowFofI);
+    }
+  });
+
+  it('pedersenAlternateOpenings: every candidate secret yields the identical commitment', () => {
+    const { commitment, openings } = pedersenAlternateOpenings(13n, 42n, [13n, 500n, 999n, 1n]);
+    expect(openings.length).toBe(4);
+    for (const o of openings) {
+      expect(o.commitment).toBe(commitment);
+      // each opening genuinely satisfies g^s * h^r == C in the small field
+      expect(mod(modPow(SMALL_G, o.secret, SMALL_P) * modPow(SMALL_H, o.randomness, SMALL_P), SMALL_P)).toBe(commitment);
+    }
+    // exactly one row is the true opening, and it uses the real randomness
+    const real = openings.filter((o) => o.isReal);
+    expect(real.length).toBe(1);
+    expect(real[0].randomness).toBe(42n);
   });
 });
 

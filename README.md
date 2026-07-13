@@ -11,7 +11,16 @@ An interactive, browser-based lab that teaches:
 - How Pedersen adds information-theoretic hiding with blinded commitments
 - What setup assumptions each protocol requires
 
-The lab includes a guided four-step flow (Break Shamir → Feldman Fix → Pedersen Upgrade → Compare), an interactive curve visualization that draws shares as points on the secret polynomial (and shows a tampered share jumping off the curve), pass/fail verification badges, beginner/advanced mode toggle, deterministic reproducibility, and a full test suite.
+The lab includes a guided four-step flow (Break Shamir → Feldman Fix → Pedersen Upgrade → Compare), an interactive curve visualization that draws shares as points on the secret polynomial (and shows a tampered share jumping off the curve), pass/fail verification badges, beginner/advanced mode toggle, deterministic reproducibility, and a full test suite. Because a 2048-bit integer is unreadable, the verification mechanism is also mirrored over a tiny illustrative prime field (`p = 2039`) so you can watch the check succeed or fail digit by digit — the same algebra, small enough to read.
+
+## Exhibits
+
+1. **Break Shamir** — a malicious dealer flips one share; reconstruction is silently poisoned because plain Shamir carries no proof of polynomial consistency.
+2. **The picture** — every participant is a point on one degree-`(t−1)` polynomial (secret at `x = 0`); a tampered share visibly lifts off the curve.
+3. **Feldman Fix** — publishes commitments `C_j = g^{a_j}` and verifies `g^{y_i} = ∏ C_j^{i^j}`. Reveal panels: **Watch the check work** decomposes the equation term by term in the readable field (LHS `g^y` vs the RHS product, with the mismatching tail highlighted when a share is tampered), and **Why the equation is even true** walks the homomorphism `g^{a+b} = g^a·g^b` in three stages, showing how recombined commitments land exactly on `g^{f(i)}`.
+4. **Pedersen Upgrade** — blinded commitments `C_j = g^{f_j}·h^{r_j}`. A **What secret could this be?** panel opens one published commitment to several different secrets, each with its own randomness but the identical commitment — information-theoretic hiding, demonstrated rather than asserted.
+5. **Side-by-side comparison** — Feldman vs Pedersen on hiding, binding, setup assumption, and share size.
+6. **Threat model, crypto parameters, and learning path** — attacker capabilities, group choices, and where VSS leads (DKG, threshold signatures, MPC).
 
 ## When to Use It
 
@@ -109,6 +118,7 @@ Tests cover:
 - Lagrange reconstruction returns original secret
 - Deterministic polynomial generation is stable
 - Subgroup generator validation (G^Q = 1, H^Q = 1)
+- Readable small-field instance: safe-prime/subgroup checks, Feldman decomposition product equals RHS, tampered share fails, homomorphism recombination lands on `g^{f(i)}`, and Pedersen equivocation yields one commitment from many secrets
 
 ## Crypto Parameter Choices
 

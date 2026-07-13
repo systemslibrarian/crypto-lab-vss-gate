@@ -4,8 +4,16 @@ import {
   H,
   P,
   Q,
+  SMALL_P,
+  SMALL_Q,
+  SMALL_G,
+  SMALL_H,
+  SMALL_H_EXP,
   buildDeterministicPolynomial,
   buildRandomPolynomial,
+  feldmanSmallTrace,
+  feldmanHomomorphism,
+  pedersenAlternateOpenings,
   formatBigint,
   mod,
   runFeldman,
@@ -389,9 +397,267 @@ const renderShareCurve = (): string => {
       </div>
       <p class="curve-note muted">
         Illustration only — small whole numbers are used so the curve is drawable. The lab's real arithmetic
-        runs in a 2048-bit prime field where points look like random integers.
+        runs in a 2048-bit prime field where points look like random integers. In
+        <strong>Step&nbsp;2</strong> you can open <em>“Watch the check work”</em> to see these same small numbers
+        run through the actual Feldman equation, digit by digit.
       </p>
     </section>
+  `;
+};
+
+// ── Readable-field teaching helpers ──────────────────────
+//
+// The curve picture is drawn from illustrativeCoeffs() — a small intercept a0
+// (the secret) and a small slope a1. We reuse THOSE SAME small numbers as the
+// polynomial for a legible instance of the *real* Feldman/Pedersen algebra over
+// SMALL_P (2039). So the intercept you see on the curve is literally the number
+// that flows through the verification equation below: one world, not two.
+
+// Which participant is tampered on the curve (null if the cheating dealer is off
+// or the index is out of range). Shared by the picture and the check panel so
+// "point off curve" and "row fails" are the same event.
+const activeCheatParticipant = (): number | null =>
+  state.cheatEnabled && state.cheatParticipant >= 1 && state.cheatParticipant <= state.participants
+    ? state.cheatParticipant
+    : null;
+
+// The small illustrative (secret, slope) pair driving both the curve and the
+// readable-field arithmetic. Kept in [2, SMALL_Q) and mirrors illustrativeCoeffs.
+const readableFieldPoly = (): { secret: bigint; slope: bigint } => {
+  const c = illustrativeCoeffs(state.secretInput, 2);
+  return { secret: BigInt(c[0]), slope: BigInt(c[1] ?? 1) };
+};
+
+// Split a decimal string into a leading part + a trailing "tail" (last k chars),
+// so a mismatch can be highlighted where big/failed numbers actually diverge.
+const splitTail = (v: bigint, k = 2): { head: string; tail: string } => {
+  const s = v.toString();
+  if (s.length <= k) {
+    return { head: '', tail: s };
+  }
+  return { head: s.slice(0, s.length - k), tail: s.slice(-k) };
+};
+
+// Render a value with its trailing digits emphasized; when `danger` is set the
+// tail is shown in the danger color to flag "this is where it diverges".
+const tailMark = (v: bigint, danger: boolean): string => {
+  const { head, tail } = splitTail(v);
+  const cls = danger ? 'tail-bad' : 'tail-ok';
+  return `<span class="mono">${escapeHtml(head)}<span class="${cls}">${escapeHtml(tail)}</span></span>`;
+};
+
+// HIGH: the verification equation, visibly decomposed for ONE participant in the
+// readable field. LHS = g^y beside RHS built term by term (C_0^1 · C_1^i · …),
+// with the mismatching tail highlighted when the share was tampered.
+const renderCheckDecomposition = (): string => {
+  const { secret, slope } = readableFieldPoly();
+  const cheatP = activeCheatParticipant();
+  // Show the check for the tampered participant when cheating is on, else P2.
+  const idx = cheatP ?? Math.min(2, state.participants);
+  const trace = feldmanSmallTrace(secret, slope, idx, cheatP === idx);
+  const bad = !trace.ok;
+
+  const termChain = trace.rhsTerms
+    .map((term) => {
+      const base = `C<sub>${term.j}</sub>`;
+      const exp = term.exponent.toString();
+      return `
+        <div class="chk-term">
+          <div class="chk-term-formula mono">${base}<sup>${escapeHtml(exp)}</sup></div>
+          <div class="chk-term-sub muted">= ${term.commitment.toString()}<sup>${escapeHtml(exp)}</sup> = <strong>${term.factor.toString()}</strong></div>
+          <div class="chk-term-partial muted">running product → <span class="mono">${term.partial.toString()}</span></div>
+        </div>
+      `;
+    })
+    .join('<div class="chk-mul" aria-hidden="true">×</div>');
+
+  const verdict = bad
+    ? `<p class="chk-verdict chk-verdict-bad"><strong>These differ.</strong> P${idx}'s share was bumped to
+        <span class="mono">y = ${trace.shareValue}</span>, but the committed curve says it must be
+        <span class="mono">f(${idx}) = ${trace.honestValue}</span>. Since <span class="mono">y ≠ f(${idx})</span>,
+        <span class="mono">g<sup>y</sup></span> can't equal the product the commitments force — the highlighted tail
+        is where they part ways. That inequality <em>is</em> the rejection.</p>`
+    : `<p class="chk-verdict chk-verdict-ok"><strong>They match.</strong> P${idx}'s share
+        <span class="mono">y = ${trace.shareValue}</span> equals <span class="mono">f(${idx})</span>, so
+        <span class="mono">g<sup>y</sup></span> lands on exactly the value the commitments reconstruct. Turn on the
+        cheating dealer above and re-open this panel to watch the two sides split apart.</p>`;
+
+  return `
+    <details class="details-block teaching-panel" id="feldman-check-decomp">
+      <summary>Watch the check work (readable numbers)</summary>
+      <div class="teaching-body">
+        <p class="muted">
+          Same Feldman equation as the table above — <span class="mono">g<sup>y<sub>i</sub></sup> = ∏ C<sub>j</sub><sup>i<sup>j</sup></sup></span> —
+          but run in a tiny prime field (<span class="mono">p = ${SMALL_P}</span>) so every number is readable.
+          The intercept <span class="mono">${secret}</span> is the very “secret” drawn on the curve above;
+          the slope is <span class="mono">${slope}</span>. We check <strong>participant P${idx}</strong>.
+        </p>
+
+        <div class="chk-columns">
+          <section class="chk-side" aria-label="Left-hand side">
+            <h4 class="chk-h">LHS — what P${idx} actually holds</h4>
+            <p class="chk-formula mono">g<sup>y</sup> = ${SMALL_G}<sup>${trace.shareValue}</sup> mod ${SMALL_P}</p>
+            <p class="chk-big ${bad ? 'chk-big-bad' : 'chk-big-ok'}">${tailMark(trace.lhs, bad)}</p>
+          </section>
+
+          <div class="chk-eq ${bad ? 'chk-eq-bad' : 'chk-eq-ok'}" aria-hidden="true">${bad ? '≠' : '='}</div>
+
+          <section class="chk-side" aria-label="Right-hand side">
+            <h4 class="chk-h">RHS — what the commitments force</h4>
+            <div class="chk-chain">${termChain}</div>
+            <p class="chk-big chk-big-ok">= ${tailMark(trace.rhs, false)}</p>
+          </section>
+        </div>
+
+        ${verdict}
+
+        <p class="muted chk-foot">
+          Nothing here is faked or weakened: these are the identical formulas the 2048-bit table runs, just small
+          enough to read. The failure you can see in four digits here is the same failure hiding inside the giant
+          integers above.
+        </p>
+      </div>
+    </details>
+  `;
+};
+
+// MEDIUM: three-stage homomorphism panel. a_j → C_j = g^(a_j), then the
+// commitments recombined at index i land exactly on g^(f(i)). Exposes WHY the
+// check works: g^(a+b) = g^a · g^b makes exponent arithmetic mirror evaluation.
+const renderHomomorphismPanel = (): string => {
+  const { secret, slope } = readableFieldPoly();
+  const idx = Math.min(2, state.participants);
+  const h = feldmanHomomorphism(secret, slope, idx);
+  const i = BigInt(idx);
+
+  const stage1 = h.coefficients
+    .map(
+      (a, j) => `
+      <div class="hz-node">
+        <div class="hz-label mono">a<sub>${j}</sub> = ${a}</div>
+        <div class="hz-arrow" aria-hidden="true">→ g<sup>a<sub>${j}</sub></sup> →</div>
+        <div class="hz-label hz-commit mono">C<sub>${j}</sub> = ${h.commitments[j]}</div>
+      </div>`
+    )
+    .join('');
+
+  const stage2 = h.terms
+    .map(
+      (t) =>
+        `<span class="hz-factor mono">C<sub>${t.j}</sub><sup>${t.exponent}</sup> = ${t.factor}</span>`
+    )
+    .join('<span class="hz-times" aria-hidden="true">·</span>');
+
+  return `
+    <details class="details-block teaching-panel" id="feldman-homomorphism">
+      <summary>Why the equation is even true (the homomorphism)</summary>
+      <div class="teaching-body">
+        <p class="muted">
+          The whole trick is one identity: <span class="mono">g<sup>a+b</sup> = g<sup>a</sup>·g<sup>b</sup></span>.
+          Because exponents add when you multiply powers of <span class="mono">g</span>, committing to each
+          coefficient and recombining reproduces <em>evaluating the polynomial</em> — in the exponent. Same readable
+          field (<span class="mono">p = ${SMALL_P}</span>), checking P${idx}.
+        </p>
+
+        <ol class="hz-stages">
+          <li class="hz-stage">
+            <span class="hz-stagenum">1</span>
+            <div>
+              <h4 class="chk-h">Commit to each coefficient</h4>
+              <div class="hz-nodes">${stage1}</div>
+            </div>
+          </li>
+          <li class="hz-stage">
+            <span class="hz-stagenum">2</span>
+            <div>
+              <h4 class="chk-h">Recombine at the index <span class="mono">i = ${idx}</span></h4>
+              <p class="hz-line">${stage2} <span class="hz-times" aria-hidden="true">=</span>
+                <span class="hz-result mono">${h.recombined}</span></p>
+            </div>
+          </li>
+          <li class="hz-stage">
+            <span class="hz-stagenum">3</span>
+            <div>
+              <h4 class="chk-h">…which is exactly <span class="mono">g<sup>f(${idx})</sup></span></h4>
+              <p class="hz-line">
+                f(${idx}) = ${h.fOfI}, so g<sup>f(${idx})</sup> = <span class="hz-result mono">${h.gPowFofI}</span>
+                <span class="hz-check ${h.match ? 'hz-check-ok' : ''}">${h.match ? '✓ they land on the same value' : ''}</span>
+              </p>
+              <p class="muted">
+                Raising each commitment to a power of the index and multiplying them <em>is</em> polynomial
+                evaluation carried out one level up, inside the exponent. That is why comparing
+                <span class="mono">g<sup>y</sup></span> to the recombined commitments verifies a share — no magic,
+                just <span class="mono">g<sup>a+b</sup> = g<sup>a</sup>·g<sup>b</sup></span>.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </details>
+  `;
+};
+
+// MEDIUM: Pedersen equivocation widget. One commitment C_0 opens to MANY secrets,
+// each with its own randomness — so the commitment reveals nothing. Demonstrated,
+// not asserted.
+const renderEquivocationPanel = (): string => {
+  const { secret } = readableFieldPoly();
+  const realR = mod(secret * 17n + 42n, SMALL_Q); // a fixed, reproducible "real" randomness
+  const candidates = [secret, mod(secret + 100n, 97n) + 2n, mod(secret + 400n, 97n) + 2n, 7n]
+    // de-dup while preserving order
+    .filter((v, i, a) => a.findIndex((x) => x === v) === i);
+  const { commitment, openings } = pedersenAlternateOpenings(secret, realR, candidates);
+
+  const rows = openings
+    .map(
+      (o) => `
+        <tr class="${o.isReal ? 'equiv-real' : ''}">
+          <td class="mono">${o.secret}${o.isReal ? ' <span class="equiv-tag">real</span>' : ''}</td>
+          <td class="mono">${o.randomness}</td>
+          <td class="mono">${o.commitment}</td>
+        </tr>`
+    )
+    .join('');
+
+  return `
+    <details class="details-block teaching-panel" id="pedersen-equivocation">
+      <summary>What secret could this commitment be? (hiding, demonstrated)</summary>
+      <div class="teaching-body">
+        <p class="muted">
+          Pedersen's commitment is <span class="mono">C = g<sup>s</sup>·h<sup>r</sup></span>. The blinding
+          <span class="mono">r</span> means that for <em>any</em> secret you name, there is a matching
+          <span class="mono">r</span> producing the <strong>exact same</strong> commitment. So the commitment alone
+          tells you nothing — even against unlimited compute. Below, one published commitment
+          <span class="mono">C = ${commitment}</span> (readable field <span class="mono">p = ${SMALL_P}</span>) is
+          opened to several different secrets:
+        </p>
+
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Pedersen equivocation openings">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Claimed secret s</th>
+                <th scope="col">Required randomness r</th>
+                <th scope="col">g<sup>s</sup>·h<sup>r</sup> mod ${SMALL_P}</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+
+        <p class="chk-verdict chk-verdict-ok">
+          <strong>Every row yields the identical commitment ${commitment}.</strong> An observer holding only
+          <span class="mono">C</span> cannot tell which secret is real — they are all equally consistent. That is
+          <em>information-theoretic hiding</em>.
+        </p>
+        <p class="muted chk-foot">
+          We can compute these alternate openings only because this illustrative field publishes
+          <span class="mono">log<sub>g</sub>(h) = ${SMALL_H_EXP}</span>. In a real deployment nobody knows that
+          value, so nobody can find a second opening — that unknown log is precisely what makes the commitment
+          <em>binding</em>. Hiding is unconditional; binding rests on that one secret.
+        </p>
+      </div>
+    </details>
   `;
 };
 
@@ -521,10 +787,16 @@ const renderStepTwo = (): string => {
 
             <div class="result-block ${run.verification.every(v => v.ok) ? 'result-ok' : 'result-bad'}">
               ${run.verification.some((v) => !v.ok)
-                ? '<p><strong>Caught.</strong> The tampered share failed verification — participants reject it before reconstruction.</p>'
+                ? `<p><strong>Caught.</strong> The tampered share failed verification — participants reject it before reconstruction.</p>
+                   <p class="result-bridge">This is the same event as the curve above: <strong>P${run.cheatedParticipant}</strong>'s
+                   point sits <em>off</em> the published curve, so its row here fails. Open
+                   <em>“Watch the check work”</em> below to see exactly which digits refuse to match.</p>`
                 : '<p><strong>All shares verified.</strong> Every participant confirmed their share matches the committed polynomial.</p>'
               }
             </div>
+
+            ${renderCheckDecomposition()}
+            ${renderHomomorphismPanel()}
 
             ${sectionHappened(
               'The dealer published g^(a_0), g^(a_1), ... as commitments. Each participant computed g^(y_i) (their share exponentiated) ' +
@@ -636,6 +908,8 @@ const renderStepThree = (): string => {
               'Pedersen gives you information-theoretic hiding — the commitments reveal <em>nothing</em> about the secret, ' +
               'even to an adversary with unlimited compute. This is critical when the secret must stay confidential during the sharing phase.'
             )}
+
+            ${renderEquivocationPanel()}
 
             ${sectionUseCase(
               'Use Pedersen when the secret itself is sensitive and must not leak through the commitment scheme — ' +

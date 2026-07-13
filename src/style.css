@@ -866,6 +866,313 @@ a:hover {
   text-decoration-thickness: 2px;
 }
 
+/* ── Teaching panels (readable-field check / homomorphism / equivocation) ── */
+.teaching-panel {
+  border-color: var(--brand);
+}
+
+.teaching-panel > summary {
+  color: var(--brand-soft);
+}
+
+.teaching-body {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.teaching-body p {
+  margin: 0.2rem 0;
+}
+
+.chk-h {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+  color: var(--brand-soft);
+}
+
+/* Emphasized trailing digits — where two big numbers actually diverge. */
+.tail-ok {
+  color: var(--ok-soft);
+  font-weight: 600;
+}
+
+.tail-bad {
+  color: var(--danger-soft);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+html[data-theme='light'] .tail-ok {
+  color: var(--ok);
+}
+
+html[data-theme='light'] .tail-bad {
+  color: var(--danger);
+}
+
+/* LHS / = / RHS layout */
+.chk-columns {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.chk-side {
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--surface-1);
+}
+
+.chk-formula {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0 0 0.4rem;
+}
+
+.chk-big {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.02rem;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  margin: 0.2rem 0 0;
+}
+
+.chk-big-ok {
+  color: var(--brand-soft);
+}
+
+.chk-big-bad {
+  color: var(--danger-soft);
+}
+
+html[data-theme='light'] .chk-big-bad {
+  color: var(--danger);
+}
+
+.chk-eq {
+  font-size: 1.7rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.chk-eq-ok {
+  color: var(--ok);
+}
+
+.chk-eq-bad {
+  color: var(--danger);
+}
+
+.chk-chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+
+.chk-term {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  background: var(--surface-2);
+  flex: 1 1 auto;
+  min-width: 8rem;
+}
+
+.chk-term-formula {
+  font-size: 0.95rem;
+  color: var(--brand-soft);
+}
+
+.chk-term-sub,
+.chk-term-partial {
+  font-size: 0.78rem;
+  margin-top: 0.2rem;
+}
+
+.chk-term-sub strong {
+  color: var(--ink);
+}
+
+.chk-mul {
+  align-self: center;
+  color: var(--muted);
+  font-weight: 700;
+  padding: 0 0.15rem;
+}
+
+.chk-verdict {
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+
+.chk-verdict-bad {
+  background: hsl(2 60% 22% / 0.22);
+  border: 1px solid var(--danger);
+}
+
+.chk-verdict-ok {
+  background: hsl(150 60% 18% / 0.2);
+  border: 1px solid var(--ok);
+}
+
+html[data-theme='light'] .chk-verdict-bad {
+  background: hsl(0 70% 94%);
+}
+
+html[data-theme='light'] .chk-verdict-ok {
+  background: hsl(155 55% 92%);
+}
+
+.chk-foot {
+  font-size: 0.82rem;
+}
+
+/* Homomorphism panel */
+.hz-stages {
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.hz-stage {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--surface-1);
+}
+
+.hz-stagenum {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--paper);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.hz-nodes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.3rem;
+}
+
+.hz-node {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.55rem;
+  background: var(--surface-2);
+}
+
+.hz-label {
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.hz-arrow {
+  color: var(--brand-soft);
+  font-size: 0.82rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.hz-commit {
+  color: var(--brand-soft);
+}
+
+.hz-line {
+  font-size: 0.92rem;
+  color: var(--ink);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+
+.hz-factor {
+  color: var(--brand-soft);
+}
+
+.hz-times {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.hz-result {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+html[data-theme='light'] .hz-result {
+  color: var(--accent);
+}
+
+.hz-check {
+  color: var(--ok);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+/* Equivocation table highlight */
+.equiv-real td {
+  background: hsl(150 60% 18% / 0.18);
+}
+
+html[data-theme='light'] .equiv-real td {
+  background: hsl(155 55% 92%);
+}
+
+.equiv-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ok-soft);
+  border: 1px solid var(--ok);
+  border-radius: 999px;
+  padding: 0.02rem 0.4rem;
+  margin-left: 0.3rem;
+}
+
+html[data-theme='light'] .equiv-tag {
+  color: hsl(156 84% 22%);
+  background: hsl(155 58% 88%);
+}
+
+.result-bridge {
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .chk-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .chk-eq {
+    font-size: 1.3rem;
+  }
+}
+
 /* Responsive */
 @media (max-width: 700px) {
   .shell {

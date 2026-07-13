@@ -409,3 +409,188 @@ export const shamirDemoWithOptions = (
     subset
   };
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// READABLE (SMALL-FIELD) ILLUSTRATIVE INSTANCE
+//
+// The lab's real work runs in the 2048-bit RFC 3526 field above; that is not
+// negotiable. But a 2048-bit integer is unreadable, so the *same* Feldman and
+// Pedersen equations are also instantiated here over a tiny safe prime so the
+// numbers are legible (three/four digits) and the check can be watched digit by
+// digit. This is an ILLUSTRATION of the identical algebra — NOT a security
+// parameter. Nothing here weakens the production path; the small field is only
+// ever used to render the teaching panels, clearly labelled as illustrative.
+//
+//   SMALL_P = 2039 is a safe prime, SMALL_Q = (p-1)/2 = 1019 is prime.
+//   SMALL_G = 4 = 2^2 generates the order-q subgroup (same construction as G).
+//   SMALL_H = g^SMALL_H_EXP lies in the subgroup. Because this is an
+//   illustration we KNOW SMALL_H_EXP = log_g(h); in production h must be chosen
+//   so nobody knows it — that unknown log is exactly what gives Pedersen its
+//   binding. Knowing it here is what lets the equivocation demo compute
+//   alternate openings (see pedersenAlternateOpenings), turning "the commitment
+//   hides the secret" from a claim into something you can verify.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const SMALL_P = 2039n;
+export const SMALL_Q = 1019n;
+export const SMALL_G = 4n;
+export const SMALL_H_EXP = 7n;
+export const SMALL_H = modPow(SMALL_G, SMALL_H_EXP, SMALL_P);
+
+// Map an arbitrary secret into a small, readable value in [2, SMALL_Q).
+export const toSmallSecret = (secret: bigint): bigint => mod(secret, 97n) + 2n;
+
+// One term of the RHS product: (commitment C_j) raised to (index i)^j, plus the
+// running partial product after multiplying it in. Lets the UI render the
+// verification as a growing chain instead of one opaque number.
+export type RhsTerm = {
+  j: number;
+  commitment: bigint;
+  exponent: bigint; // i^j mod q
+  factor: bigint; // C_j ^ (i^j) mod p
+  partial: bigint; // running product mod p
+};
+
+export type FeldmanSmallTrace = {
+  p: bigint;
+  q: bigint;
+  g: bigint;
+  index: number;
+  coefficients: bigint[];
+  commitments: bigint[];
+  shareValue: bigint; // y_i actually held (already tampered if applicable)
+  honestValue: bigint; // f(i) the share *should* be
+  tampered: boolean;
+  lhs: bigint; // g^(y_i)
+  rhsTerms: RhsTerm[];
+  rhs: bigint; // ∏ C_j^(i^j)
+  ok: boolean;
+};
+
+// Build a full, legible Feldman verification trace for ONE participant in the
+// small field: LHS = g^y, RHS decomposed term by term. Mirrors
+// verifyFeldmanShare exactly, just instrumented and over SMALL_P.
+export const feldmanSmallTrace = (
+  smallSecret: bigint,
+  slope: bigint,
+  index: number,
+  tamper: boolean
+): FeldmanSmallTrace => {
+  const coefficients = [mod(smallSecret, SMALL_Q), mod(slope, SMALL_Q)];
+  const commitments = coefficients.map((c) => modPow(SMALL_G, c, SMALL_P));
+  const i = BigInt(index);
+  const honestValue = evalPolynomial(coefficients, i, SMALL_Q);
+  const shareValue = tamper ? mod(honestValue + 1n, SMALL_Q) : honestValue;
+
+  const lhs = modPow(SMALL_G, shareValue, SMALL_P);
+
+  const rhsTerms: RhsTerm[] = [];
+  let rhs = 1n;
+  let power = 1n; // i^j mod q
+  for (let j = 0; j < commitments.length; j += 1) {
+    const factor = modPow(commitments[j], power, SMALL_P);
+    rhs = mod(rhs * factor, SMALL_P);
+    rhsTerms.push({ j, commitment: commitments[j], exponent: power, factor, partial: rhs });
+    power = mod(power * i, SMALL_Q);
+  }
+
+  return {
+    p: SMALL_P,
+    q: SMALL_Q,
+    g: SMALL_G,
+    index,
+    coefficients,
+    commitments,
+    shareValue,
+    honestValue,
+    tampered: tamper,
+    lhs,
+    rhsTerms,
+    rhs,
+    ok: lhs === rhs
+  };
+};
+
+// Three-stage homomorphism trace: coefficient a_j → commitment C_j = g^(a_j),
+// then the commitments recombined at index i landing exactly on g^(f(i)).
+// Shows WHY exponent arithmetic in the commitments mirrors evaluating f.
+export type HomomorphismStage = {
+  index: number;
+  coefficients: bigint[];
+  commitments: bigint[];
+  fOfI: bigint; // f(i) mod q
+  gPowFofI: bigint; // g^(f(i)) mod p — the target
+  recombined: bigint; // ∏ C_j^(i^j) — should equal gPowFofI
+  terms: RhsTerm[];
+  match: boolean;
+};
+
+export const feldmanHomomorphism = (
+  smallSecret: bigint,
+  slope: bigint,
+  index: number
+): HomomorphismStage => {
+  const coefficients = [mod(smallSecret, SMALL_Q), mod(slope, SMALL_Q)];
+  const commitments = coefficients.map((c) => modPow(SMALL_G, c, SMALL_P));
+  const i = BigInt(index);
+  const fOfI = evalPolynomial(coefficients, i, SMALL_Q);
+  const gPowFofI = modPow(SMALL_G, fOfI, SMALL_P);
+
+  const terms: RhsTerm[] = [];
+  let recombined = 1n;
+  let power = 1n;
+  for (let j = 0; j < commitments.length; j += 1) {
+    const factor = modPow(commitments[j], power, SMALL_P);
+    recombined = mod(recombined * factor, SMALL_P);
+    terms.push({ j, commitment: commitments[j], exponent: power, factor, partial: recombined });
+    power = mod(power * i, SMALL_Q);
+  }
+
+  return {
+    index,
+    coefficients,
+    commitments,
+    fOfI,
+    gPowFofI,
+    recombined,
+    terms,
+    match: recombined === gPowFofI
+  };
+};
+
+// Pedersen equivocation: given the small-field commitment C_0 = g^s · h^r to a
+// secret, compute a valid alternate opening (s', r') for EACH candidate secret
+// such that g^(s') · h^(r') == C_0 exactly. Possible because in this illustration
+// we know SMALL_H_EXP = log_g(h): r' = r + (s − s')·(log_g h)^(−1) (mod q). Every
+// row produces the identical commitment, so the commitment reveals nothing about
+// which secret is real — information-theoretic hiding, demonstrated.
+export type PedersenOpening = {
+  secret: bigint;
+  randomness: bigint;
+  commitment: bigint; // g^secret · h^randomness mod p — identical across rows
+  isReal: boolean;
+};
+
+export const pedersenAlternateOpenings = (
+  realSecret: bigint,
+  realRandomness: bigint,
+  candidateSecrets: bigint[]
+): { commitment: bigint; openings: PedersenOpening[] } => {
+  const s = mod(realSecret, SMALL_Q);
+  const r = mod(realRandomness, SMALL_Q);
+  const commitment = mod(modPow(SMALL_G, s, SMALL_P) * modPow(SMALL_H, r, SMALL_P), SMALL_P);
+  const hInv = modPow(SMALL_H_EXP, SMALL_Q - 2n, SMALL_Q); // (log_g h)^(-1) mod q
+
+  const openings: PedersenOpening[] = candidateSecrets.map((cand) => {
+    const sp = mod(cand, SMALL_Q);
+    const rp = mod(r + (s - sp) * hInv, SMALL_Q);
+    return {
+      secret: sp,
+      randomness: rp,
+      commitment: mod(modPow(SMALL_G, sp, SMALL_P) * modPow(SMALL_H, rp, SMALL_P), SMALL_P),
+      isReal: sp === s
+    };
+  });
+
+  return { commitment, openings };
+};
