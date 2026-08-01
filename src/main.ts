@@ -1019,7 +1019,7 @@ const renderStepFour = (): string => {
                 <tbody>
                   <tr><td>Commitment form</td><td class="mono">g^(a_j)</td><td class="mono">g^(a_j) · h^(r_j)</td></tr>
                   <tr><td>Hiding</td><td>Computational (leaks secret)</td><td>Information-theoretic</td></tr>
-                  <tr><td>Binding</td><td>Computational</td><td>Computational</td></tr>
+                  <tr><td>Binding</td><td>Perfect (g^a fixes a uniquely)</td><td>Computational (rests on unknown log_g h)</td></tr>
                   <tr><td>Setup assumption</td><td>Group parameters only</td><td>Independent h with unknown log_g(h)</td></tr>
                   <tr><td>Share size</td><td>1 field element</td><td>2 field elements</td></tr>
                   <tr><td>Use when</td><td>Secret is already public</td><td>Secret must stay hidden</td></tr>
