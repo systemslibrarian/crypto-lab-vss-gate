@@ -39,7 +39,7 @@ The lab runs a guided four-step flow — Break Shamir → Feldman Fix → Peders
 
 - With plain Shamir, a malicious dealer can hand out inconsistent shares that pass naive reconstruction but corrupt the recovered secret — the exact gap VSS closes.
 - Feldman commitments publish `C_j = g^{a_j} mod p`, which verifies shares but leaks information about the polynomial coefficients; it is not hiding.
-- Pedersen's hiding holds only if the second generator `h` has an unknown discrete log relative to `g`; if `log_g(h)` is known, the binding/hiding guarantee collapses (this demo derives `h` deterministically and is therefore not secure).
+- Pedersen's *binding* — not its hiding — is what rests on the second generator `h` having an unknown discrete log relative to `g`. Hiding is information-theoretic and holds unconditionally: for every candidate secret there is randomness producing the same commitment, whether or not anyone knows `log_g(h)`. Knowing `log_g(h)` does not reveal the secret; it lets the dealer *find* those alternate openings and so equivocate, which is exactly what breaks binding. This demo derives `h` deterministically from `g`, so `log_g(h)` is knowable from the source and its Pedersen binding is broken by construction — that is what makes the "What secret could this be?" panel able to compute the alternate openings it shows.
 - A weak or predictable source of randomness for the polynomial coefficients destroys secrecy without breaking a single verification check — Feldman and Pedersen verify the dealer's arithmetic, not the dealer's entropy, so every badge stays green while an attacker recovers the secret from fewer than `t` shares. This lab therefore samples coefficients from `crypto.getRandomValues` only, with no `Math.random()` fallback: if Web Crypto is unavailable it halts and says why rather than degrading silently.
 - BigInt arithmetic in JavaScript is not constant-time, so an implementation like this leaks via side channels and must not handle real secrets.
 - Using a generator that does not span the prime-order subgroup, or mismatched participant indices, makes the verification equations and Lagrange reconstruction fail.
@@ -103,7 +103,7 @@ After completing the four-step guided lab, you should understand:
 
 1. **The dealer cheating problem**: Shamir shares alone carry no proof of polynomial consistency.
 2. **Commitment-based verification**: Feldman publishes `C_j = g^{a_j} mod p` so participants verify `g^{y_i} = ∏ C_j^{x_i^j}`.
-3. **Pedersen's stronger hiding**: Dual commitments `C_j = g^{a_j} · h^{r_j}` yield information-theoretic hiding, at the cost of a trusted setup for `h`.
+3. **Pedersen's stronger hiding**: Dual commitments `C_j = g^{a_j} · h^{r_j}` yield information-theoretic hiding, trading Feldman's perfect binding for binding that is only computational — and that is what the trusted setup for `h` buys back.
 4. **Feldman vs Pedersen tradeoffs**: Feldman requires no extra setup but leaks coefficient information. Pedersen hides coefficients but requires independent `h`.
 
 ## Test Suite
