@@ -40,6 +40,7 @@ The lab runs a guided four-step flow — Break Shamir → Feldman Fix → Peders
 - With plain Shamir, a malicious dealer can hand out inconsistent shares that pass naive reconstruction but corrupt the recovered secret — the exact gap VSS closes.
 - Feldman commitments publish `C_j = g^{a_j} mod p`, which verifies shares but leaks information about the polynomial coefficients; it is not hiding.
 - Pedersen's hiding holds only if the second generator `h` has an unknown discrete log relative to `g`; if `log_g(h)` is known, the binding/hiding guarantee collapses (this demo derives `h` deterministically and is therefore not secure).
+- A weak or predictable source of randomness for the polynomial coefficients destroys secrecy without breaking a single verification check — Feldman and Pedersen verify the dealer's arithmetic, not the dealer's entropy, so every badge stays green while an attacker recovers the secret from fewer than `t` shares. This lab therefore samples coefficients from `crypto.getRandomValues` only, with no `Math.random()` fallback: if Web Crypto is unavailable it halts and says why rather than degrading silently.
 - BigInt arithmetic in JavaScript is not constant-time, so an implementation like this leaks via side channels and must not handle real secrets.
 - Using a generator that does not span the prime-order subgroup, or mismatched participant indices, makes the verification equations and Lagrange reconstruction fail.
 

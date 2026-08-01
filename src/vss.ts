@@ -95,6 +95,39 @@ const hashStringToBigint = (input: string): bigint => {
   return acc;
 };
 
+/**
+ * Thrown when no cryptographically secure RNG is available.
+ *
+ * This deliberately has no fallback path. The polynomial coefficients sampled
+ * here ARE the secret sharing: with a predictable coefficient an attacker
+ * reconstructs the secret from fewer than t shares, which is precisely the
+ * failure this whole demo exists to explain. Silently degrading to
+ * `Math.random()` would leave the page showing a green "verified" badge over
+ * shares that are not secret at all — a lie a learner has no way to detect.
+ *
+ * Every browser that can run this module has `crypto.getRandomValues`; it has
+ * been in Chrome, Firefox, Safari, and Edge for over a decade. If it is missing,
+ * the environment is broken and stopping is the honest response.
+ */
+export class InsecureRandomnessError extends Error {
+  constructor() {
+    super(
+      'No cryptographically secure random source: crypto.getRandomValues is unavailable. ' +
+        'Refusing to generate secret-sharing coefficients from a predictable fallback, because ' +
+        'shares built on one are not secret. Use a browser with Web Crypto (all current browsers), ' +
+        'or a secure context if this page was served over plain HTTP.'
+    );
+    this.name = 'InsecureRandomnessError';
+  }
+}
+
+const secureRandomBytes = (byteLength: number): Uint8Array => {
+  if (typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') {
+    throw new InsecureRandomnessError();
+  }
+  return crypto.getRandomValues(new Uint8Array(byteLength));
+};
+
 const randomBigintBelow = (modulus: bigint, deterministicRng?: () => bigint): bigint => {
   if (deterministicRng) {
     while (true) {
@@ -105,34 +138,17 @@ const randomBigintBelow = (modulus: bigint, deterministicRng?: () => bigint): bi
     }
   }
 
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    const byteLength = Math.ceil(modulus.toString(2).length / 8);
-    const bytes = new Uint8Array(byteLength);
-    while (true) {
-      crypto.getRandomValues(bytes);
-      const candidate = bytesToBigint(bytes);
-      if (candidate > 0n && candidate < modulus) {
-        return candidate;
-      }
-    }
-  }
-
+  const byteLength = Math.ceil(modulus.toString(2).length / 8);
   while (true) {
-    const candidate = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
+    const candidate = bytesToBigint(secureRandomBytes(byteLength));
     if (candidate > 0n && candidate < modulus) {
       return candidate;
     }
   }
 };
 
-const randomSeed = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    const bytes = new Uint8Array(16);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  }
-  return `fallback-${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
-};
+const randomSeed = (): string =>
+  Array.from(secureRandomBytes(16), (b) => b.toString(16).padStart(2, '0')).join('');
 
 const normalizeRunOptions = (options?: RunOptions): { deterministic: boolean; seed: string } => ({
   deterministic: Boolean(options?.deterministic),

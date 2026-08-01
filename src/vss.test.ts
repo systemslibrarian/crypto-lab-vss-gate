@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  InsecureRandomnessError,
   mod,
   modPow,
   P,
@@ -224,5 +225,47 @@ describe('Group parameters (RFC 3526 group 14)', () => {
 
   it('Q passes a Fermat base-2 primality check (2^(Q-1) ≡ 1)', () => {
     expect(modPow(2n, Q - 1n, Q)).toBe(1n);
+  });
+});
+
+describe('Randomness policy: no silent fallback', () => {
+  // Regression guard. This module used to fall back to Math.random() when
+  // crypto.getRandomValues was missing, with nothing said in the UI. In a demo
+  // about verifiable secret sharing that is the exact failure the subject warns
+  // about: the Feldman and Pedersen checks would still pass, because they verify
+  // the dealer's arithmetic and not the dealer's entropy, so every badge would
+  // stay green over shares that are not secret.
+  const withoutWebCrypto = (fn: () => void): void => {
+    const original = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', { value: undefined, configurable: true });
+    try {
+      fn();
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', { value: original, configurable: true });
+    }
+  };
+
+  it('throws InsecureRandomnessError instead of degrading to Math.random()', () => {
+    withoutWebCrypto(() => {
+      expect(() => runFeldman(1234n, 2, 4, null)).toThrow(InsecureRandomnessError);
+      expect(() => runPedersen(1234n, 2, 4, null)).toThrow(InsecureRandomnessError);
+    });
+  });
+
+  it('the error names the risk rather than reporting a generic failure', () => {
+    withoutWebCrypto(() => {
+      let message = '';
+      try {
+        runFeldman(1234n, 2, 4, null);
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toContain('crypto.getRandomValues');
+      expect(message).toContain('not secret');
+    });
+  });
+
+  it('still works normally when Web Crypto is present', () => {
+    expect(runFeldman(1234n, 2, 4, null).verification.every((v) => v.ok)).toBe(true);
   });
 });

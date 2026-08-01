@@ -2,6 +2,7 @@ import './style.css';
 import {
   G,
   H,
+  InsecureRandomnessError,
   P,
   Q,
   SMALL_P,
@@ -1114,6 +1115,27 @@ const renderParameters = (): string => `
           <li><strong>h derived from g:</strong> deterministic for reproducibility. In production, use hash-to-curve or a CRS.</li>
         </ul>
       </article>
+      <article class="card">
+        <h3>Randomness</h3>
+        <p>
+          Polynomial coefficients and blinding factors come from
+          <code>crypto.getRandomValues</code> only. There is no fallback: if Web Crypto is
+          unavailable the lab halts with an explanation rather than substituting
+          <code>Math.random()</code>.
+        </p>
+        <p class="muted">
+          That matters more here than almost anywhere. Predictable coefficients let an attacker
+          recover the secret from fewer than <em>t</em> shares, and no Feldman or Pedersen check
+          would notice — the commitments would still match the shares, so every badge on this page
+          would stay green while the secret leaked. Verifiable sharing verifies the dealer's
+          arithmetic, not the dealer's entropy.
+        </p>
+        <p class="muted">
+          The <strong>deterministic</strong> toggle in the lab controls is the one exception, and it
+          is explicit: it seeds a reproducible generator so a walkthrough replays identically. Runs
+          made in that mode are for reading, not for secrecy.
+        </p>
+      </article>
     </div>
   </details>
 `;
@@ -1388,4 +1410,48 @@ const bindEvents = (): void => {
 // data-theme + persists it. All page styling keys off CSS variables, so theme
 // changes repaint without a re-render here.
 
-render();
+/**
+ * Render, but if the secure RNG is missing, say so instead of showing a lab.
+ *
+ * `vss.ts` now refuses to sample polynomial coefficients without
+ * `crypto.getRandomValues` rather than silently falling back to `Math.random()`.
+ * That refusal is only useful if the learner sees it — a blank page from an
+ * uncaught throw would read as an ordinary bug. This turns it into the lesson.
+ */
+const renderOrExplainRngFailure = (): void => {
+  try {
+    render();
+  } catch (error) {
+    if (!(error instanceof InsecureRandomnessError)) {
+      throw error;
+    }
+    app.innerHTML = `
+      <main class="shell" id="main-content" role="main">
+        <section class="exhibit rng-halt" role="alert">
+          <h1>Stopped: no secure randomness available</h1>
+          <p>
+            This browser does not expose <code>crypto.getRandomValues</code>, so there is no
+            cryptographically secure source of random numbers on this page.
+          </p>
+          <p>
+            The lab refuses to continue rather than quietly substituting
+            <code>Math.random()</code>. Shamir's scheme keeps a secret only because the polynomial
+            coefficients above the constant term are unpredictable. Sample them from a predictable
+            generator and an attacker recovers the secret from fewer than <em>t</em> shares — while
+            every Feldman and Pedersen check on this page still shows a reassuring green
+            &ldquo;verified&rdquo;. Those checks would not even be lying: the commitments really
+            would match the shares. The secret would simply be gone anyway. Showing you that is
+            worse than showing you nothing.
+          </p>
+          <p>
+            Every current browser supports Web Crypto. If you are seeing this, the page is most
+            likely being served over plain HTTP from a non-localhost origin, which is not a secure
+            context — load it over HTTPS instead.
+          </p>
+        </section>
+      </main>
+    `;
+  }
+};
+
+renderOrExplainRngFailure();

@@ -141,6 +141,25 @@ html[data-theme='light'] body {
   box-shadow: 0 0 0 1px hsl(0 0% 100% / 0.04), 0 18px 38px hsl(220 70% 3% / 0.35);
 }
 
+/* Shown INSTEAD of the lab when crypto.getRandomValues is unavailable. The
+   module refuses to sample coefficients from a predictable generator, and this
+   is where that refusal becomes visible rather than a blank page. */
+.rng-halt {
+  border-color: var(--danger);
+  max-width: 56rem;
+  margin: 3rem auto;
+}
+
+.rng-halt h1 {
+  margin-top: 0;
+  color: var(--danger);
+  font-size: 1.4rem;
+}
+
+.rng-halt p {
+  line-height: 1.65;
+}
+
 .eyebrow {
   margin: 0;
   letter-spacing: 0.14em;
