@@ -6,6 +6,18 @@
   --paper: hsl(221 45% 8%);
   --card: hsl(222 30% 14% / 0.84);
   --line: hsl(201 100% 62% / 0.25);
+  /* Control boundaries only (WCAG 2.1 SC 1.4.11). Text fields and selects are
+     filled with --surface-1, which composites to within ~1.1:1 of the .exhibit
+     card behind them, so the 1px border is the only thing delineating the
+     control. --line is 25%-alpha cyan and lands at 1.31-1.35:1 there.
+     --border-strong is opaque, keeps the lab's cyan cast, and was measured
+     against the *composited* surfaces — every stop of the body gradient
+     (three linear stops plus the two radial tints) with --card, --surface-1
+     and --surface-2 layered on top. Worst case over all of them: 4.71:1
+     (--surface-2 on card, over the cyan radial stop); best 5.23:1.
+     --line is left unchanged for decorative rules: exhibit/card outlines,
+     table rules, the timeline divider, SVG strokes. */
+  --border-strong: #4f9ec0;
   --brand: hsl(197 100% 58%);
   --brand-dark: hsl(191 98% 44%);
   --brand-soft: hsl(196 100% 84%);
@@ -28,6 +40,10 @@ html[data-theme='light'] {
   --paper: hsl(210 67% 97%);
   --card: hsl(0 0% 100% / 0.86);
   --line: hsl(201 92% 44% / 0.25);
+  /* Light-theme control boundary, same rationale and same gradient-stop sweep
+     as the dark token above. #2c7f9e is 4.38:1 at worst (--card over the cyan
+     radial stop) and 4.53:1 at best. */
+  --border-strong: #2c7f9e;
   --brand: hsl(196 93% 37%);
   --brand-dark: hsl(194 87% 31%);
   --brand-soft: hsl(196 74% 27%);
@@ -238,7 +254,9 @@ select {
   padding: 0.56rem 0.7rem;
   min-height: 2.75rem;
   border-radius: 0.65rem;
-  border: 1px solid var(--line);
+  /* --border-strong, not --line: the fill is --surface-1, within ~1.1:1 of the
+     card behind it, so this border is load-bearing. See the token for ratios. */
+  border: 1px solid var(--border-strong);
   background: var(--surface-1);
   color: var(--ink);
 }
