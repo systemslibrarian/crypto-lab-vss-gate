@@ -90,19 +90,29 @@ const clampPositiveInt = (value: string, fallback: number, min: number, max: num
   return Math.min(max, Math.max(min, n));
 };
 
-const parseSecret = (): bigint => {
+/**
+ * The secret the lab is actually sharing, and whether it came from the box.
+ *
+ * A non-integer used to fall back to 1 in silence, so every table, badge and
+ * reconstruction below described a run on the number 1 while the field still
+ * showed what the learner typed. The fallback stays — the lab has to share
+ * something — but it is now stated on screen.
+ */
+const parseSecretResult = (): { value: bigint; ok: boolean } => {
   const v = state.secretInput.trim();
   // BigInt('') is 0n, so an empty/whitespace field would silently become 0 —
   // treat it as invalid and use the same fallback as a parse failure.
   if (v === '') {
-    return 1n;
+    return { value: 1n, ok: false };
   }
   try {
-    return BigInt(v);
+    return { value: BigInt(v), ok: true };
   } catch {
-    return 1n;
+    return { value: 1n, ok: false };
   }
 };
+
+const parseSecret = (): bigint => parseSecretResult().value;
 
 const short = (v: bigint): string => {
   const s = formatBigint(v);
@@ -192,13 +202,28 @@ const renderDecisionGuide = (): string => `
 
 // ── Lab Controls ─────────────────────────────────────────
 
+const renderSecretNote = (): string => {
+  const parsed = parseSecretResult();
+  if (!parsed.ok) {
+    return `<p id="secret-note" class="callout warning" role="alert">
+      <strong>Not a whole number.</strong> “${escapeHtml(state.secretInput)}” cannot be read as an integer, so the
+      lab is sharing the fallback secret <span class="mono">1</span>. Every table, badge and reconstruction below
+      describes that fallback, not what you typed.
+    </p>`;
+  }
+  return `<p id="secret-note" class="muted">
+    Sharing the secret <span class="mono">${short(mod(parsed.value, Q))}</span> — your input reduced mod
+    <span class="mono">q</span>, which is the value the polynomial's constant term actually takes.
+  </p>`;
+};
+
 const renderLabControls = (): string => `
   <section class="exhibit" id="lab-controls">
     <h2>Lab Controls</h2>
     <p class="muted">These settings apply to every step below. Change them and re-run any protocol.</p>
     <div class="controls-grid">
       <label for="secret-input">Secret (integer)
-        <input id="secret-input" type="text" value="${escapeHtml(state.secretInput)}" />
+        <input id="secret-input" type="text" aria-describedby="secret-note" value="${escapeHtml(state.secretInput)}" />
       </label>
       <label for="threshold-input">Threshold t
         <input id="threshold-input" type="number" min="2" max="6" value="${state.threshold}" />
@@ -227,6 +252,7 @@ const renderLabControls = (): string => `
           .join('')}</select>
       </label>
     </div>
+    ${renderSecretNote()}
   </section>
 `;
 
@@ -989,6 +1015,12 @@ const renderStepFour = (): string => {
         'verification behavior, and security properties.'
       )}
 
+      <p class="muted" id="compare-scope">
+        Both runs here use <strong>honest shares</strong>, whatever the “Cheating dealer” toggle says, and the same
+        secret polynomial f(x) — so the badges below isolate the difference between the two constructions rather
+        than reporting on a tamper. Steps 2 and 3 are where the tampered share is caught.
+      </p>
+
       <button id="run-compare" type="button">Compare Feldman vs. Pedersen</button>
 
       ${
@@ -1238,103 +1270,132 @@ const copyText = async (content: string): Promise<void> => {
   await navigator.clipboard.writeText(content);
 };
 
+/**
+ * Drop every completed protocol run.
+ *
+ * A verification table is a statement about one exact configuration: this
+ * secret, this threshold t, these n participants, and this cheating-dealer
+ * setting. Only the secret / determinism / seed controls used to clear it, so
+ * moving t, n, the "Cheating dealer" checkbox or the tampered-participant
+ * selector left the old table standing — including the "Caught." verdict and
+ * its claim that the failing row is "the same event as the curve above", while
+ * the curve and the "Watch the check work" panel (both computed live from the
+ * controls) had already moved to the new setting. Two panels in the same paint
+ * described different runs, and one of them said so explicitly.
+ */
+const clearRuns = (): void => {
+  state.feldmanRun = null;
+  state.pedersenRun = null;
+  state.sideBySideFeldman = null;
+  state.sideBySidePedersen = null;
+  state.pedersenPrevCommitments = null;
+  state.shamirCache = null;
+};
+
 const bindEvents = (): void => {
   const secretInput = document.querySelector<HTMLInputElement>('#secret-input');
   secretInput?.addEventListener('input', () => {
-    state.secretInput = secretInput.value;
-    state.feldmanRun = null;
-    state.pedersenRun = null;
-    state.sideBySideFeldman = null;
-    state.sideBySidePedersen = null;
-    state.shamirCache = null;
-    render();
+    update(() => {
+      state.secretInput = secretInput.value;
+      clearRuns();
+    });
   });
 
   const thresholdInput = document.querySelector<HTMLInputElement>('#threshold-input');
   thresholdInput?.addEventListener('input', () => {
-    state.threshold = clampPositiveInt(thresholdInput.value, state.threshold, 2, 6);
-    if (state.threshold > state.participants) {
-      state.participants = state.threshold;
-    }
-    render();
+    update(() => {
+      state.threshold = clampPositiveInt(thresholdInput.value, state.threshold, 2, 6);
+      if (state.threshold > state.participants) {
+        state.participants = state.threshold;
+      }
+      clearRuns();
+    });
   });
 
   const participantsInput = document.querySelector<HTMLInputElement>('#participants-input');
   participantsInput?.addEventListener('input', () => {
-    state.participants = clampPositiveInt(participantsInput.value, state.participants, 2, 8);
-    if (state.threshold > state.participants) {
-      state.threshold = state.participants;
-    }
-    if (state.cheatParticipant > state.participants) {
-      state.cheatParticipant = state.participants;
-    }
-    render();
+    update(() => {
+      state.participants = clampPositiveInt(participantsInput.value, state.participants, 2, 8);
+      if (state.threshold > state.participants) {
+        state.threshold = state.participants;
+      }
+      if (state.cheatParticipant > state.participants) {
+        state.cheatParticipant = state.participants;
+      }
+      clearRuns();
+    });
   });
 
   const deterministicMode = document.querySelector<HTMLInputElement>('#deterministic-mode');
   deterministicMode?.addEventListener('change', () => {
-    state.deterministicMode = deterministicMode.checked;
-    state.feldmanRun = null;
-    state.pedersenRun = null;
-    state.sideBySideFeldman = null;
-    state.sideBySidePedersen = null;
-    state.shamirCache = null;
-    render();
+    update(() => {
+      state.deterministicMode = deterministicMode.checked;
+      clearRuns();
+    });
   });
 
   const deterministicSeed = document.querySelector<HTMLInputElement>('#deterministic-seed');
   deterministicSeed?.addEventListener('input', () => {
-    state.deterministicSeed = deterministicSeed.value || 'vss-gate-lab-seed';
-    state.feldmanRun = null;
-    state.pedersenRun = null;
-    state.sideBySideFeldman = null;
-    state.sideBySidePedersen = null;
-    state.shamirCache = null;
-    render();
+    update(() => {
+      state.deterministicSeed = deterministicSeed.value || 'vss-gate-lab-seed';
+      clearRuns();
+    });
   });
 
   const advancedMode = document.querySelector<HTMLInputElement>('#advanced-mode');
   advancedMode?.addEventListener('change', () => {
-    state.advancedMode = advancedMode.checked;
-    render();
+    // Display-only: reveals coefficients already computed, so no run is invalidated.
+    update(() => {
+      state.advancedMode = advancedMode.checked;
+    });
   });
 
   const cheatEnabled = document.querySelector<HTMLInputElement>('#cheat-enabled');
   cheatEnabled?.addEventListener('change', () => {
-    state.cheatEnabled = cheatEnabled.checked;
-    render();
+    update(() => {
+      state.cheatEnabled = cheatEnabled.checked;
+      clearRuns();
+    });
   });
 
   const cheatParticipant = document.querySelector<HTMLSelectElement>('#feldman-cheat-participant');
   cheatParticipant?.addEventListener('change', () => {
-    state.cheatParticipant = clampPositiveInt(cheatParticipant.value, 2, 1, state.participants);
-    render();
+    update(() => {
+      state.cheatParticipant = clampPositiveInt(cheatParticipant.value, 2, 1, state.participants);
+      clearRuns();
+    });
   });
 
   const shamirCheatEnabled = document.querySelector<HTMLInputElement>('#shamir-cheat-enabled');
   shamirCheatEnabled?.addEventListener('change', () => {
-    state.shamirCheatEnabled = shamirCheatEnabled.checked;
-    state.shamirCache = null;
-    render();
+    update(() => {
+      state.shamirCheatEnabled = shamirCheatEnabled.checked;
+      state.shamirCache = null;
+    });
   });
 
   const shamirCheatParticipant = document.querySelector<HTMLSelectElement>('#shamir-cheat-participant');
   shamirCheatParticipant?.addEventListener('change', () => {
-    state.shamirCheatParticipant = clampPositiveInt(shamirCheatParticipant.value, 2, 1, 4);
-    state.shamirCache = null;
-    render();
+    update(() => {
+      state.shamirCheatParticipant = clampPositiveInt(shamirCheatParticipant.value, 2, 1, 4);
+      state.shamirCache = null;
+    });
   });
 
   const runFeldmanBtn = document.querySelector<HTMLButtonElement>('#run-feldman');
   runFeldmanBtn?.addEventListener('click', () => {
-    state.feldmanRun = runFeldman(
-      parseSecret(),
-      state.threshold,
-      state.participants,
-      state.cheatEnabled ? state.cheatParticipant : null,
-      deterministicOptions()
-    );
-    render();
+    const painted = update(() => {
+      state.feldmanRun = runFeldman(
+        parseSecret(),
+        state.threshold,
+        state.participants,
+        state.cheatEnabled ? state.cheatParticipant : null,
+        deterministicOptions()
+      );
+    });
+    if (!painted || !state.feldmanRun) {
+      return;
+    }
     const failed = state.feldmanRun.verification.some((v) => !v.ok);
     announce(
       failed
@@ -1346,16 +1407,20 @@ const bindEvents = (): void => {
   const runPedersenBtn = document.querySelector<HTMLButtonElement>('#run-pedersen');
   runPedersenBtn?.addEventListener('click', () => {
     const prior = state.pedersenRun?.commitments ?? null;
-    state.pedersenRun = runPedersen(
-      parseSecret(),
-      state.threshold,
-      state.participants,
-      state.cheatEnabled ? state.cheatParticipant : null,
-      undefined,
-      deterministicOptions()
-    );
-    state.pedersenPrevCommitments = prior;
-    render();
+    const painted = update(() => {
+      state.pedersenRun = runPedersen(
+        parseSecret(),
+        state.threshold,
+        state.participants,
+        state.cheatEnabled ? state.cheatParticipant : null,
+        undefined,
+        deterministicOptions()
+      );
+      state.pedersenPrevCommitments = prior;
+    });
+    if (!painted || !state.pedersenRun) {
+      return;
+    }
     const failed = state.pedersenRun.verification.some((v) => !v.ok);
     announce(
       failed
@@ -1366,26 +1431,29 @@ const bindEvents = (): void => {
 
   const compareBtn = document.querySelector<HTMLButtonElement>('#run-compare');
   compareBtn?.addEventListener('click', () => {
-    const secret = parseSecret();
-    const label = `compare-${state.threshold}-${state.participants}`;
-    // Both protocols share ONE secret polynomial f(x) so the comparison isolates
-    // the protocol difference, not the randomness — in random mode too.
-    const basePoly = state.deterministicMode
-      ? buildDeterministicPolynomial(secret, state.threshold, label, state.deterministicSeed)
-      : buildRandomPolynomial(secret, state.threshold);
+    const painted = update(() => {
+      const secret = parseSecret();
+      const label = `compare-${state.threshold}-${state.participants}`;
+      // Both protocols share ONE secret polynomial f(x) so the comparison isolates
+      // the protocol difference, not the randomness — in random mode too.
+      const basePoly = state.deterministicMode
+        ? buildDeterministicPolynomial(secret, state.threshold, label, state.deterministicSeed)
+        : buildRandomPolynomial(secret, state.threshold);
 
-    state.sideBySideFeldman = runFeldmanWithPolynomial(basePoly, state.participants, null);
+      state.sideBySideFeldman = runFeldmanWithPolynomial(basePoly, state.participants, null);
 
-    state.sideBySidePedersen = runPedersen(
-      secret,
-      state.threshold,
-      state.participants,
-      null,
-      basePoly,
-      deterministicOptions()
-    );
-
-    render();
+      state.sideBySidePedersen = runPedersen(
+        secret,
+        state.threshold,
+        state.participants,
+        null,
+        basePoly,
+        deterministicOptions()
+      );
+    });
+    if (!painted) {
+      return;
+    }
     announce('Comparison ready. Feldman and Pedersen ran with the same secret polynomial and threshold.');
   });
 
@@ -1411,21 +1479,37 @@ const bindEvents = (): void => {
 // changes repaint without a re-render here.
 
 /**
- * Render, but if the secure RNG is missing, say so instead of showing a lab.
+ * Apply a state change and repaint, turning a missing secure RNG into the lab's
+ * halt panel instead of an uncaught exception. Returns false when it halted, so
+ * a caller does not go on to announce a result that was never produced.
  *
- * `vss.ts` now refuses to sample polynomial coefficients without
+ * `vss.ts` refuses to sample polynomial coefficients without
  * `crypto.getRandomValues` rather than silently falling back to `Math.random()`.
  * That refusal is only useful if the learner sees it — a blank page from an
  * uncaught throw would read as an ordinary bug. This turns it into the lesson.
+ *
+ * It used to guard the FIRST paint only. Every later interaction called render()
+ * directly, so in a browser without Web Crypto the lab booted fine in its default
+ * deterministic mode — which needs no randomness — and then threw out of the
+ * listener the moment anyone unticked "Deterministic mode", leaving a half-updated
+ * page and no explanation. Every repaint goes through here now.
  */
-const renderOrExplainRngFailure = (): void => {
+const update = (mutate: () => void = () => {}): boolean => {
   try {
+    mutate();
     render();
+    return true;
   } catch (error) {
     if (!(error instanceof InsecureRandomnessError)) {
       throw error;
     }
-    app.innerHTML = `
+    renderRngHalt();
+    return false;
+  }
+};
+
+const renderRngHalt = (): void => {
+  app.innerHTML = `
       <main class="shell" id="main-content" role="main">
         <section class="exhibit rng-halt" role="alert">
           <h1>Stopped: no secure randomness available</h1>
@@ -1451,7 +1535,6 @@ const renderOrExplainRngFailure = (): void => {
         </section>
       </main>
     `;
-  }
 };
 
-renderOrExplainRngFailure();
+update();

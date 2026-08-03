@@ -109,17 +109,20 @@ After completing the four-step guided lab, you should understand:
 ## Test Suite
 
 ```bash
-npm test          # single run
-npm run test:watch # watch mode
+npm test             # unit tests (vitest), single run
+npm run test:watch   # watch mode
+npm run test:browser # Playwright: 24 claims tests + 2 axe scans
 ```
 
-Tests cover:
+Unit tests cover:
 - Feldman valid shares pass / tampered share fails
 - Pedersen valid shares pass / tampered share fails
 - Lagrange reconstruction returns original secret
 - Deterministic polynomial generation is stable
 - Subgroup generator validation (G^Q = 1, H^Q = 1)
 - Readable small-field instance: safe-prime/subgroup checks, Feldman decomposition product equals RHS, tampered share fails, homomorphism recombination lands on `g^{f(i)}`, and Pedersen equivocation yields one commitment from many secrets
+
+`e2e/claims.spec.ts` covers what the *page* claims, driving the real UI in headless Chromium. It asserts no fixed cryptographic values — every expectation is one page-computed value checked against another, or a small-field number recomputed from the page's own printed operands. In particular: each verification badge must equal the comparison of the LHS and RHS printed beside it; each `C_j^(i^j)` and running product in the "Watch the check work" chain must be the modular arithmetic it says it is; the homomorphism panel's recombination must land on the `g^{f(i)}` it prints; and every equivocation row's `(s, r)` must genuinely open the one published commitment. It also drives the failure paths (tampered share at every victim, non-integer secret, no secure RNG) and asserts that no verification table outlives the controls that produced it. Both suites, plus the axe-core WCAG A/AA scan in both themes, run in CI before every deploy.
 
 ## Crypto Parameter Choices
 

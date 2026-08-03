@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:a11y": "playwright test"
+    "test:browser": "playwright test"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
