@@ -44,17 +44,39 @@ html[data-theme='light'] {
      as the dark token above. #2c7f9e is 4.38:1 at worst (--card over the cyan
      radial stop) and 4.53:1 at best. */
   --border-strong: #2c7f9e;
-  --brand: hsl(196 93% 37%);
-  --brand-dark: hsl(194 87% 31%);
+  /* Every one of these carries TEXT somewhere on the page, and each was set to
+     a lightness that reads as "the dark-theme hue, darkened a bit" rather than
+     one measured against the surfaces it lands on. Measured on the lightest
+     surface each is used over (near-white --card, and the tinted step and
+     badge fills, which are lighter still):
+       --brand      37% -> 30%   4.01:1 -> 5.49:1   (h2, summary, and as a fill
+                                                     under --paper text: 3.78:1
+                                                     -> 5.21:1)
+       --brand-dark 31% -> 25%   4.32:1 -> 5.87:1   (the button gradient, under
+                                                     --paper text)
+       --accent     47% -> 33%   2.81:1 -> 4.91:1   (.step-number, the hero
+                                                     "WHY IT MATTERS" label, the
+                                                     SVG secret label, .hz-result)
+                                 36% was enough on near-white but not on the
+                                 hero aside, which sits on the page's cyan
+                                 radial and composites to rgb(208,229,235) —
+                                 4.32:1 there. Measured on the darkest surface
+                                 the token lands on, not the lightest.
+       --ok         30% -> 26%   4.47:1 -> 5.41:1   (.decision-when, .tail-ok,
+                                                     .hz-check-ok)
+       --warn       44% -> 30%   2.71:1 -> 5.19:1   (the Threat Model heading)
+     The -soft variants are backgrounds and are left alone. */
+  --brand: hsl(196 93% 30%);
+  --brand-dark: hsl(194 87% 25%);
   --brand-soft: hsl(196 74% 27%);
   --brand-glow: hsl(196 88% 39% / 0.18);
-  --accent: hsl(24 83% 47%);
+  --accent: hsl(24 84% 33%);
   --accent-soft: hsl(29 93% 86%);
-  --ok: hsl(156 78% 30%);
+  --ok: hsl(156 78% 26%);
   --ok-soft: hsl(155 58% 81%);
   --danger: hsl(2 72% 44%);
   --danger-soft: hsl(0 81% 90%);
-  --warn: hsl(38 89% 44%);
+  --warn: hsl(38 89% 30%);
   --warn-soft: hsl(46 92% 86%);
   --surface-1: hsl(0 0% 100% / 0.92);
   --surface-2: hsl(0 0% 100% / 1);
