@@ -129,19 +129,18 @@ const secureRandomBytes = (byteLength: number): Uint8Array => {
 };
 
 const randomBigintBelow = (modulus: bigint, deterministicRng?: () => bigint): bigint => {
+  // Sharing coefficients and Pedersen blinders range over the entire field,
+  // including zero. Excluding zero changes their conditional distributions.
+  // The injected source is a test hook; it makes no uniform-randomness claim.
   if (deterministicRng) {
-    while (true) {
-      const candidate = mod(deterministicRng(), modulus);
-      if (candidate > 0n && candidate < modulus) {
-        return candidate;
-      }
-    }
+    return mod(deterministicRng(), modulus);
   }
 
   const byteLength = Math.ceil(modulus.toString(2).length / 8);
   while (true) {
     const candidate = bytesToBigint(secureRandomBytes(byteLength));
-    if (candidate > 0n && candidate < modulus) {
+    // Reject the upper tail rather than reducing random bytes modulo q.
+    if (candidate < modulus) {
       return candidate;
     }
   }

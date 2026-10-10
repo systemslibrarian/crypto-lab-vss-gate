@@ -126,6 +126,13 @@ Unit tests cover:
 
 ## Crypto Parameter Choices
 
+In random mode, rejection sampling draws polynomial coefficients and every Pedersen
+blinder (including `r0`) uniformly from the whole scalar field `[0, q)`. Zero is
+valid, including as the highest-degree coefficient; nonzero restrictions belong
+to group generators, not these scalars. Perfect-hiding statements assume this
+full-field randomness. The seeded deterministic walkthrough is reproducible and
+explicitly **not for secrecy**. The known-log `h` binding limitation remains separate.
+
 | Parameter | Value | Reason |
 |-----------|-------|--------|
 | `p` | RFC 3526 Group 14 (2048-bit safe prime) | Prime field with clean algebraic structure and inverses |
