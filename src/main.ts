@@ -1154,6 +1154,9 @@ const renderParameters = (): string => `
           <code>crypto.getRandomValues</code> only. There is no fallback: if Web Crypto is
           unavailable the lab halts with an explanation rather than substituting
           <code>Math.random()</code>.
+          Random-mode coefficients and every Pedersen blinder are sampled uniformly
+          over the full scalar field [0, q), including zero. Even the highest-degree
+          coefficient may be zero; forcing it nonzero changes the sharing distribution.
         </p>
         <p class="muted">
           That matters more here than almost anywhere. Predictable coefficients let an attacker
