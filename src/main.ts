@@ -188,12 +188,12 @@ const renderDecisionGuide = (): string => `
       </article>
       <article class="decision-card">
         <h3>Feldman</h3>
-        <p class="decision-when">When you need to verify shares but the secret doesn't need to stay hidden from observers.</p>
-        <p class="decision-risk">Risk: commitments reveal the secret to anyone watching.</p>
+        <p class="decision-when">When participants need to verify shares and publishing g<sup>s</sup> is acceptable.</p>
+        <p class="decision-risk">For a secret s, the public commitment lets an observer check a guess. Secrets with few possible values are especially exposed.</p>
       </article>
       <article class="decision-card">
         <h3>Pedersen</h3>
-        <p class="decision-when">When you need both verification and hiding — the commitment reveals nothing about the secret.</p>
+        <p class="decision-when">When you need share verification and secret hiding. Fresh, uniform blinding keeps the commitment independent of the secret.</p>
         <p class="decision-risk">Risk: requires an independent second generator h. If someone knows log_g(h), they can forge commitments.</p>
       </article>
     </div>
@@ -399,8 +399,8 @@ const renderShareCurve = (): string => {
     <section class="exhibit curve-viz" aria-labelledby="curve-viz-title">
       <h2 id="curve-viz-title">The picture: shares are points on a curve</h2>
       <p class="muted">
-        A <span class="mono">t</span>-of-<span class="mono">n</span> sharing hides the secret in a degree-(<span class="mono">t−1</span>)
-        polynomial. Each participant gets one point on it. Adjust the controls above and watch the curve respond.
+        A <span class="mono">t</span>-of-<span class="mono">n</span> sharing puts the secret at zero on a polynomial of degree at most <span class="mono">t−1</span>.
+        Each participant gets one point on it. Adjust the controls above and watch the curve respond.
       </p>
       <figure class="curve-figure">
         <svg viewBox="0 0 ${W} ${Hh}" role="img"
@@ -654,7 +654,7 @@ const renderEquivocationPanel = (): string => {
           Pedersen's commitment is <span class="mono">C = g<sup>s</sup>·h<sup>r</sup></span>. The blinding
           <span class="mono">r</span> means that for <em>any</em> secret you name, there is a matching
           <span class="mono">r</span> producing the <strong>exact same</strong> commitment. So the commitment alone
-          tells you nothing — even against unlimited compute. Below, one published commitment
+          has the same distribution for every secret when the blinder is uniform and independent. Below, one published commitment
           <span class="mono">C = ${commitment}</span> (readable field <span class="mono">p = ${SMALL_P}</span>) is
           opened to several different secrets:
         </p>
@@ -674,14 +674,14 @@ const renderEquivocationPanel = (): string => {
 
         <p class="chk-verdict chk-verdict-ok">
           <strong>Every row yields the identical commitment ${commitment}.</strong> An observer holding only
-          <span class="mono">C</span> cannot tell which secret is real — they are all equally consistent. That is
-          <em>information-theoretic hiding</em>.
+          <span class="mono">C</span> sees a value consistent with every secret. With fresh, uniform blinding,
+          each secret gives that commitment the same probability. That is <em>information-theoretic hiding</em>.
         </p>
         <p class="muted chk-foot">
           We can compute these alternate openings only because this illustrative field publishes
           <span class="mono">log<sub>g</sub>(h) = ${SMALL_H_EXP}</span>. In a real deployment nobody knows that
-          value, so nobody can find a second opening — that unknown log is precisely what makes the commitment
-          <em>binding</em>. Hiding is unconditional; binding rests on that one secret.
+          value. Finding a second opening would require solving for that log, which is the assumption behind
+          computational <em>binding</em>.
         </p>
       </div>
     </details>
@@ -836,12 +836,11 @@ const renderStepTwo = (): string => {
             )}
 
             ${sectionUseCase(
-              'Use Feldman when you need share verification but the <em>secret value itself isn\'t sensitive</em> — ' +
-              'e.g., when the secret is a public key component already visible on-chain.'
+              'Use Feldman when participants need to verify shares and g^s is intended to be public, as in a threshold signing key.'
             )}
 
             ${sectionTradeoffs([
-              'Commitments reveal the secret: C_0 = g^s, so anyone with the commitments can compute s via discrete log (for small s) or confirm a guess.',
+              'The public value C_0 = g^s confirms or rules out a candidate secret. Recovering a uniformly random field element requires solving a discrete logarithm.',
               'Adds t group elements of public data (the commitments).',
               'Standard reference: Feldman, "A Practical Scheme for Non-interactive Verifiable Secret Sharing," FOCS 1987.',
             ])}
@@ -932,8 +931,9 @@ const renderStepThree = (): string => {
             )}
 
             ${sectionMatters(
-              'Pedersen gives you information-theoretic hiding — the commitments reveal <em>nothing</em> about the secret, ' +
-              'even to an adversary with unlimited compute. This is critical when the secret must stay confidential during the sharing phase.'
+              '<span id="pedersen-privacy">' + (state.deterministicMode
+                ? 'This run uses a public seed to make its coefficients and blinders reproducible. Use random mode for the privacy guarantee.'
+                : 'This run uses fresh, uniform blinding. The distribution of each public commitment is the same for every secret.') + '</span>'
             )}
 
             ${renderEquivocationPanel()}
@@ -1051,11 +1051,11 @@ const renderStepFour = (): string => {
                 <thead><tr><th>Property</th><th>Feldman</th><th>Pedersen</th></tr></thead>
                 <tbody>
                   <tr><td>Commitment form</td><td class="mono">g^(a_j)</td><td class="mono">g^(a_j) · h^(r_j)</td></tr>
-                  <tr><td>Hiding</td><td>Computational (leaks secret)</td><td>Information-theoretic</td></tr>
+                  <tr><td>Hiding</td><td>Public g^s lets an observer check a guess</td><td>Information-theoretic hiding with fresh, uniform blinding</td></tr>
                   <tr><td>Binding</td><td>Perfect (g^a fixes a uniquely)</td><td>Computational (rests on unknown log_g h)</td></tr>
                   <tr><td>Setup assumption</td><td>Group parameters only</td><td>Independent h with unknown log_g(h)</td></tr>
                   <tr><td>Share size</td><td>1 field element</td><td>2 field elements</td></tr>
-                  <tr><td>Use when</td><td>Secret is already public</td><td>Secret must stay hidden</td></tr>
+                  <tr><td>Use when</td><td>g^s can be public</td><td>The commitment must hide s</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1098,9 +1098,9 @@ const renderThreatModel = (): string => `
       <article class="card">
         <h3>What's protected</h3>
         <ul>
-          <li><strong>Feldman:</strong> share correctness (binding). Secret is <em>not</em> hidden.</li>
-          <li><strong>Pedersen:</strong> share correctness <em>and</em> secret hiding.</li>
-          <li>Both: threshold property — fewer than t shares reveal nothing.</li>
+          <li>In both schemes, t valid shares at distinct participant indices reconstruct the secret.</li>
+          <li><strong>Feldman:</strong> shares are verifiable. The public commitment g<sup>s</sup> can distinguish candidate secrets even before shares are disclosed.</li>
+          <li><strong>Pedersen:</strong> with fresh, independent uniform nonconstant coefficients and blinders, the commitments and fewer than t shares reveal no information about the secret.</li>
         </ul>
       </article>
       <article class="card">
@@ -1108,7 +1108,7 @@ const renderThreatModel = (): string => `
         <ul>
           <li>Availability — a malicious participant can refuse to contribute.</li>
           <li>Side channels — timing, memory access patterns, etc.</li>
-          <li>This demo: h is derived deterministically, which breaks Pedersen's binding in practice.</li>
+          <li>This demo computes h from a public exponent of g. Pedersen's binding guarantee requires that exponent to be unknown.</li>
         </ul>
       </article>
       <article class="card">
@@ -1150,7 +1150,7 @@ const renderParameters = (): string => `
       <article class="card">
         <h3>Randomness</h3>
         <p>
-          Polynomial coefficients and blinding factors come from
+          In random mode, polynomial coefficients above the constant term and blinding factors come from
           <code>crypto.getRandomValues</code> only. There is no fallback: if Web Crypto is
           unavailable the lab halts with an explanation rather than substituting
           <code>Math.random()</code>.

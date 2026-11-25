@@ -701,7 +701,27 @@ test('the page never claims this Pedersen instance is production-safe', async ({
 
   const notes = await page.locator('.callout.warning').allTextContents();
   expect(notes.some((n) => n.includes('log_g(h)'))).toBe(true);
-  expect(await textOf(page.locator('.threat-model'))).toContain(
-    'h is derived deterministically, which breaks Pedersen\'s binding in practice',
-  );
+  const model = await textOf(page.locator('.threat-model'));
+  expect(model).toContain('h from a public exponent of g');
+  expect(model).toContain("binding guarantee requires that exponent to be unknown");
+});
+
+test('the privacy claims distinguish public commitments, the threshold, and the randomness mode', async ({ page, errors }) => {
+  void errors;
+  await open(page);
+  const model = page.locator('.threat-model');
+  await expect(model).toContainText('t valid shares at distinct participant indices reconstruct');
+  await expect(model).toContainText('can distinguish candidate secrets');
+  await expect(model).toContainText('commitments and fewer than t shares reveal no information');
+  await page.locator('#run-compare').click();
+  const hiding = page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'Hiding', exact: true }) });
+  await expect(hiding.getByRole('cell').nth(1)).toContainText('Public g^s');
+  await expect(hiding.getByRole('cell').nth(2)).toContainText('fresh, uniform blinding');
+
+  await page.locator('#run-pedersen').click();
+  await expect(page.locator('#pedersen-privacy')).toContainText('public seed');
+  await page.locator('#deterministic-mode').uncheck();
+  await expect(page.locator('#pedersen-privacy')).toHaveCount(0);
+  await page.locator('#run-pedersen').click();
+  await expect(page.locator('#pedersen-privacy')).toContainText('fresh, uniform blinding');
 });
