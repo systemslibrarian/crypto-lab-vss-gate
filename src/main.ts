@@ -162,7 +162,7 @@ const renderHero = (): string => `
     </div>
     <aside class="cl-hero-why" aria-label="Why it matters">
       <span class="cl-hero-why-label">WHY IT MATTERS</span>
-      <p class="cl-hero-why-text">Plain Shamir sharing assumes an honest dealer — a malicious one can silently hand out bad shares that only fail at reconstruction. VSS lets each holder catch the fraud immediately, and Pedersen even hides the secret from the commitments themselves.</p>
+      <p class="cl-hero-why-text">Plain Shamir shares can reconstruct a different secret without any warning. In this lab you can compare the result with the secret you entered. Feldman and Pedersen also let each holder check a share against the dealer’s published commitments.</p>
     </aside>
   </header>
   <section class="exhibit hero">
@@ -184,7 +184,7 @@ const renderDecisionGuide = (): string => `
       <article class="decision-card">
         <h3>Shamir</h3>
         <p class="decision-when">When you trust the dealer completely.</p>
-        <p class="decision-risk">Risk: a dishonest dealer can hand out bad shares and no one will know until reconstruction fails.</p>
+        <p class="decision-risk">If a share is wrong, exactly t distinct shares still determine a polynomial of degree at most t−1. Its value at zero can be the wrong secret.</p>
       </article>
       <article class="decision-card">
         <h3>Feldman</h3>
@@ -278,7 +278,7 @@ const verificationRows = (
 
 // ── Visual intuition: shares are points on a curve ───────
 
-// Small, *illustrative* coefficients — NOT the 2048-bit field values — so the
+// Small, *illustrative* coefficients — separate from the share-field values — so the
 // polynomial can actually be drawn. a0 (the y-intercept at x = 0) is "the secret".
 // Derived deterministically from the typed secret so the picture is stable.
 const illustrativeCoeffs = (secretInput: string, threshold: number): number[] => {
@@ -393,7 +393,7 @@ const renderShareCurve = (): string => {
   const caption =
     cheatP === null
       ? `All ${n} points sit on one degree-${t - 1} curve. Any <strong>${t}</strong> of them pin it down exactly — and the secret is the curve's value at <span class="mono">x = 0</span>.`
-      : `The dealer pushed <strong>P${cheatP}</strong>'s point <em>off</em> the curve. With plain Shamir there's no published curve to compare against, so nobody notices — that's the gap. Feldman and Pedersen publish commitments to the curve, which is exactly what lets verification reject this point.`;
+      : `The dealer pushed <strong>P${cheatP}</strong>'s point <em>off</em> the curve. A participant holding a single plain Shamir share has no published commitment against which to check it. Feldman and Pedersen publish commitments to the curve, which is exactly what lets verification reject this point.`;
 
   return `
     <section class="exhibit curve-viz" aria-labelledby="curve-viz-title">
@@ -423,8 +423,8 @@ const renderShareCurve = (): string => {
         <span class="vz-key"><span class="vz-dot vz-dot-tamper"></span>tampered share</span>
       </div>
       <p class="curve-note muted">
-        Illustration only — small whole numbers are used so the curve is drawable. The lab's real arithmetic
-        runs in a 2048-bit prime field where points look like random integers. In
+        This picture uses a small illustrative secret derived from the text you enter. Its intercept can differ from your entered secret.
+        The share tables use arithmetic modulo q, a 2047-bit prime. The commitments use a group modulo the 2048-bit prime p. In
         <strong>Step&nbsp;2</strong> you can open <em>“Watch the check work”</em> to see these same small numbers
         run through the actual Feldman equation, digit by digit.
       </p>
@@ -748,14 +748,14 @@ const renderStepOne = (): string => {
         </p>
         <p>Expected: <span class="mono">${short(mod(secret, Q))}</span></p>
         <p>${reconstructedOk
-          ? 'Reconstruction matched — this run happened to use honest shares.'
-          : 'Reconstruction <strong>failed</strong>. The cheated share corrupted the result, and nobody could tell in advance.'
+          ? 'Reconstruction matched the entered secret. This pair contains two honest shares.'
+          : 'Reconstruction returned a different value. The lab detects the mismatch by comparing it with the entered secret. These two shares alone give no warning.'
         }</p>
       </div>
 
       ${sectionHappened(
         'Shamir shares are just polynomial evaluations. There\'s no checksum, no commitment — nothing for a participant to verify. ' +
-        'A dishonest dealer can substitute any value and no one detects it until it\'s too late.'
+        'One participant cannot check whether the dealer gave everyone points on the same polynomial.'
       )}
 
       ${sectionMatters(
@@ -770,7 +770,7 @@ const renderStepOne = (): string => {
       ${sectionTradeoffs([
         'Smallest share size (1 field element per share).',
         'Zero overhead — no commitments, no extra computation.',
-        'No verification at all — cheating is invisible until reconstruction.',
+        'With exactly the threshold number of shares, interpolation returns a value even when one share is wrong.',
       ])}
 
       <button class="copy-btn" type="button" data-copy="${escapeHtml(

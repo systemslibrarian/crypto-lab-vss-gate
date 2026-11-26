@@ -79,6 +79,12 @@ describe('Pedersen VSS', () => {
 });
 
 describe('Lagrange reconstruction', () => {
+  it('returns a field value for either pair in the classroom example', () => {
+    const first = { participant: 1, value: 8n };
+    expect(lagrangeAtZero([first, { participant: 2, value: 11n }])).toBe(5n);
+    expect(lagrangeAtZero([first, { participant: 2, value: 12n }])).toBe(4n);
+  });
+
   it('returns original secret from valid shares', () => {
     const secret = 123456789n;
     const run = runFeldman(secret, 3, 5, null, DETERMINISTIC);

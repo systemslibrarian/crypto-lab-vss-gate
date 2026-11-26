@@ -421,7 +421,8 @@ test('Shamir reconstruction misses under a cheating dealer and matches without o
   let got = ints((await textOf(block)).split('→')[1])[0];
   let want = ints((await textOf(block)).split('Expected:')[1])[0];
   expect(got).not.toBe(want);
-  expect(await textOf(block)).toContain('Reconstruction <strong>failed'.replace(/<[^>]+>/g, ''));
+  expect(await textOf(block)).toContain('The lab detects the mismatch by comparing it with the entered secret');
+  expect(await textOf(block)).toContain('These two shares alone give no warning');
 
   await page.locator('#shamir-cheat-enabled').uncheck();
   got = ints((await textOf(block)).split('→')[1])[0];
